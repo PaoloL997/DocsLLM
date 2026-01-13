@@ -230,12 +230,52 @@ html, body {
     color: var(--text-color);
 }
 
+.sidebar-login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.sidebar-login-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--secondary-color);
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.sidebar-login-btn {
+    padding: 6px;
+    background-color: var(--black, #1a1a1a);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.sidebar-user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.sidebar.closed .sidebar-login-form {
+    display: none;
+}
+
 .sidebar-footer {
     display: flex;
     align-items: center;
     gap: 10px;
     padding-top: 16px;
     border-top: 1px solid var(--border-color);
+    min-height: 60px;
 }
 
 .sidebar-avatar {

@@ -30,11 +30,20 @@
                 </ul>
             </nav>
 
-            <div class="sidebar-footer">
-                <div class="sidebar-avatar">P</div>
-                <div class="sidebar-user">
-                    <span class="sidebar-user-name">paolol</span>
-                    <span class="sidebar-user-plan">AI Specialist</span>
+            <div class="sidebar-footer" id="userContainer">
+                <!-- Mostrato se non loggato -->
+                <div id="loginForm" class="sidebar-login-form">
+                    <input type="text" id="usernameInput" placeholder="Username..." class="sidebar-login-input">
+                    <button id="loginBtn" class="sidebar-login-btn">Accedi</button>
+                </div>
+                
+                <!-- Mostrato se loggato (nascosto di default) -->
+                <div id="userInfo" class="sidebar-user-info" style="display: none;">
+                    <div class="sidebar-avatar" id="userAvatar">?</div>
+                    <div class="sidebar-user">
+                        <span class="sidebar-user-name" id="userNameDisplay"></span>
+                        <span class="sidebar-user-plan" id="userRoleDisplay"></span>
+                    </div>
                 </div>
             </div>
         </aside>
@@ -44,7 +53,7 @@
         <main class="main">
             <div class="greeting-section">
                 <span class="greeting-icon">✱</span>
-                <h1 class="greeting-text" id="greeting"></h1>
+                <h1 class="greeting-text" id="greeting">Accedi al tuo account</h1>
             </div>
 
             <section class="chat-card">

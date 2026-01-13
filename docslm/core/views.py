@@ -1,3 +1,6 @@
+import os
+import csv
+from django.conf import settings
 from django.shortcuts import render
 from django.http import JsonResponse
 from datetime import datetime
@@ -9,19 +12,9 @@ def index(request):
 
 
 def get_greeting(request):
-    """Return a greeting message based on time of day."""
-    hour = datetime.now().hour
-    
-    if 5 <= hour < 12:
-        greeting = "Buongiorno"
-    elif 12 <= hour < 17:
-        greeting = "Buon pomeriggio"
-    else:
-        greeting = "Buonasera"
-    
+    """Return a placeholder for the default greeting state."""
     return JsonResponse({
-        'greeting': greeting,
-        'name': 'paolol'
+        'greeting': 'Accedi al tuo account'
     })
 
 
@@ -41,3 +34,38 @@ def send_message(request):
         })
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+def user_login(request):
+    """Login using CSV file for simplicity."""
+    if request.method == 'POST':
+        import json
+        data = json.loads(request.body)
+        username = data.get('username', '').strip().lower()
+        
+        csv_path = os.path.join(settings.BASE_DIR, 'users.csv')
+        
+        try:
+            with open(csv_path, mode='r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row['username'].lower() == username:
+                        return JsonResponse({
+                            'success': True,
+                            'name': row['display_name'],
+                            'role': row['role'],
+                            'initial': row['display_name'][0].upper()
+                        })
+                
+            return JsonResponse({
+                'success': False,
+                'error': 'Utente non trovato'
+            }, status=404)
+            
+        except FileNotFoundError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Database utenti non configurato'
+            }, status=500)
+            
+    return JsonResponse({'success': False, 'error': 'Metodo non consentito'}, status=405)

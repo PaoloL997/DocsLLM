@@ -15,15 +15,9 @@ function initializeDropdown() {
 
 // Load greeting message
 async function loadGreeting() {
-    try {
-        const response = await fetch('/api/greeting/');
-        const data = await response.json();
-        const greetingElement = document.getElementById('greeting');
-        greetingElement.textContent = `${data.greeting}, ${data.name}`;
-    } catch (error) {
-        console.error('Error loading greeting:', error);
-        document.getElementById('greeting').textContent = 'Buongiorno, paolol';
-    }
+    const greetingElement = document.getElementById('greeting');
+    // Default message when not logged in
+    greetingElement.textContent = 'Accedi al tuo account';
 }
 
 // Setup event listeners
@@ -36,12 +30,57 @@ function setupEventListeners() {
     const modelMenu = document.getElementById('modelMenu');
     const sidebar = document.getElementById('sidebar');
     const sidebarToggle = document.getElementById('sidebarToggle');
+    const loginBtn = document.getElementById('loginBtn');
+    const usernameInput = document.getElementById('usernameInput');
 
     // Sidebar toggle
     if (sidebar && sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
             const isClosed = sidebar.classList.toggle('closed');
             sidebarToggle.setAttribute('aria-label', isClosed ? 'Apri sidebar' : 'Chiudi sidebar');
+        });
+    }
+
+    // Login functionality
+    if (loginBtn && usernameInput) {
+        loginBtn.addEventListener('click', async function() {
+            const username = usernameInput.value.trim();
+            if (!username) return;
+
+            try {
+                const response = await fetch('/api/login/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ username: username })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('userInfo').style.display = 'flex';
+                    document.getElementById('userNameDisplay').textContent = data.name;
+                    document.getElementById('userRoleDisplay').textContent = data.role;
+                    document.getElementById('userAvatar').textContent = data.initial;
+                    
+                    // Update main greeting
+                    const greetingElement = document.getElementById('greeting');
+                    if (greetingElement) {
+                        greetingElement.textContent = `Benvenuto, ${data.name}`;
+                    }
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+            }
+        });
+
+        // Allow login with Enter key
+        usernameInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                loginBtn.click();
+            }
         });
     }
 
