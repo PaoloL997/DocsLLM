@@ -34,12 +34,13 @@ html, body {
 
 .sidebar {
     width: 280px;
+    height: 100vh;
     padding: 24px 20px;
     background-color: var(--sidebar-bg);
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 16px;
     transition: width 0.2s ease, padding 0.2s ease;
     overflow: hidden;
     flex-shrink: 0;
@@ -52,8 +53,14 @@ html, body {
 
 .sidebar.closed .sidebar-logo,
 .sidebar.closed .sidebar-label,
-.sidebar.closed .sidebar-user {
+.sidebar.closed .sidebar-user,
+.sidebar.closed .sidebar-search-input {
     display: none !important;
+}
+
+.sidebar.closed .sidebar-search {
+    display: flex;
+    justify-content: center;
 }
 
 .sidebar.closed .sidebar-action {
@@ -110,6 +117,198 @@ html, body {
     font-size: 18px;
     font-weight: 600;
     letter-spacing: 0.4px;
+}
+
+.sidebar-search {
+    position: relative;
+    width: 100%;
+}
+
+.sidebar-search-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-family: 'Fira Mono', monospace;
+    font-size: 13px;
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-color);
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.sidebar-search-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(212, 112, 77, 0.1);
+}
+
+.sidebar.closed .sidebar-search-input::placeholder {
+    color: var(--text-light);
+    opacity: 0.7;
+}
+
+/* Search Results */
+.sidebar-search-results {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0 4px;
+    margin-top: 8px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.sidebar.closed .sidebar-search-results {
+    display: none !important;
+}
+
+.job-card {
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+}
+
+.job-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 1px var(--accent-color);
+}
+
+.job-card-number {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.job-info-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.job-info-btn:hover {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.open {
+    display: flex;
+}
+
+.modal-content {
+    background-color: var(--secondary-color);
+    width: 90%;
+    max-width: 500px;
+    border-radius: 20px;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    animation: modalAppear 0.3s ease-out;
+}
+
+@keyframes modalAppear {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--sidebar-bg);
+}
+
+.modal-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-light);
+}
+
+.modal-body {
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.detail-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+.detail-value {
+    font-size: 14px;
+    color: var(--text-color);
+}
+
+.sidebar-search-toggle {
+    display: none;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--text-light);
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.sidebar.closed .sidebar-search-toggle {
+    display: flex;
+}
+
+.sidebar-search-toggle:hover {
+    color: var(--text-color);
 }
 
 .sidebar-toggle {
