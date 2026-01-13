@@ -1,0 +1,138 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocsLLM</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-logo">DocsLLM</span>
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Chiudi sidebar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="sidebar-action">
+                    <span class="sidebar-icon">＋</span>
+                    <span class="sidebar-label">Nuova chat</span>
+                </button>
+
+                <ul class="sidebar-links">
+                    <li class="sidebar-link is-active" title="Chat">
+                        <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span class="sidebar-label">Chat</span>
+                    </li>
+                    <li class="sidebar-link" title="Commesse">
+                        <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span class="sidebar-label">Commesse</span>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-avatar">P</div>
+                <div class="sidebar-user">
+                    <span class="sidebar-user-name">paolol</span>
+                    <span class="sidebar-user-plan">AI Specialist</span>
+                </div>
+            </div>
+        </aside>
+
+        <div class="container">
+        <!-- Main Content -->
+        <main class="main">
+            <div class="greeting-section">
+                <span class="greeting-icon">✱</span>
+                <h1 class="greeting-text" id="greeting"></h1>
+            </div>
+
+            <section class="chat-card">
+                <div class="chat-card-input">
+                    <textarea
+                        id="messageInput"
+                        class="message-input"
+                        placeholder="Come posso aiutarti oggi?"
+                        rows="1"
+                    ></textarea>
+                </div>
+
+                <div class="chat-card-footer">
+                    <div class="chat-controls-left">
+                        <button class="control-btn" id="attachBtn" aria-label="Aggiungi">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                        </button>
+                        <button class="control-btn" id="settingsBtn" aria-label="Impostazioni">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="chat-controls-right">
+                        <div class="model-control">
+                            <button class="model-dropdown" id="modelSelect" aria-label="Seleziona modello">
+                                <span class="model-selected">gpt-4.1-nano</span>
+                                <svg class="model-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6"></path>
+                                </svg>
+                            </button>
+                            <div class="model-dropdown-menu" id="modelMenu">
+                                <div class="model-option" data-value="gpt-4.1-nano">
+                                    <div class="model-option-content">
+                                        <div class="model-option-title">gpt-4.1-nano</div>
+                                        <div class="model-option-desc">Il più veloce per risposte rapide</div>
+                                    </div>
+                                    <svg class="model-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M20 6L9 17l-5-5"></path>
+                                    </svg>
+                                </div>
+                                <div class="model-option" data-value="gpt-4.1-mini">
+                                    <div class="model-option-content">
+                                        <div class="model-option-title">gpt-4.1-mini</div>
+                                        <div class="model-option-desc">Ideale per attività quotidiane</div>
+                                    </div>
+                                    <svg class="model-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M20 6L9 17l-5-5"></path>
+                                    </svg>
+                                </div>
+                                <div class="model-option model-other">
+                                    <div class="model-option-content">
+                                        <div class="model-option-title">Altri modelli</div>
+                                    </div>
+                                    <svg class="model-arrow-right" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M9 18l6-6-6-6"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn-send" id="sendBtn" title="Invia messaggio">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 19V5M5 12l7-7 7 7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+        </div>
+    </div>
+
+    <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>
