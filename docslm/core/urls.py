@@ -12,4 +12,5 @@ urlpatterns = [
     path('api/list-collections/', views.list_collections, name='list_collections'),
     path('api/list-job-files/', views.list_job_files, name='list_job_files'),
     path('api/create-collection/', views.create_collection, name='create_collection'),
+    path('api/initialize-agent/', views.initialize_agent, name='initialize_agent'),
 ]

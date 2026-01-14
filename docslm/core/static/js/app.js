@@ -361,19 +361,24 @@ function renderCollections(collections, container, commessaCode) {
             </svg>
         `;
 
-        card.addEventListener('click', () => {
+        card.addEventListener('click', async () => {
             // Check if this card is already selected BEFORE removing
             const wasSelected = card.classList.contains('selected');
             
             // Remove selection from all cards
             document.querySelectorAll('.collection-card').forEach((c) => c.classList.remove('selected'));
             
-            // If it wasn't selected, select it now
+            // If it wasn't selected, select it now and initialize agent
             if (!wasSelected) {
                 card.classList.add('selected');
                 console.log('Selected collection:', collection.name);
+                
+                // Initialize agent
+                await initializeAgent(commessaCode, collection.name);
             } else {
                 console.log('Deselected collection:', collection.name);
+                activeCollection = null;
+                hideAgentStatus();
             }
         });
 
@@ -390,6 +395,91 @@ function renderCollections(collections, container, commessaCode) {
 let currentCommessaCode = null;
 // Selected files in the create-collection modal
 let modalSelectedFiles = [];
+// Active collection
+let activeCollection = null;
+
+function showAgentLoading() {
+    const loading = document.querySelector('.agent-loading');
+    const success = document.querySelector('.agent-success');
+    const error = document.querySelector('.agent-error');
+    if (loading) loading.style.display = 'flex';
+    if (success) success.style.display = 'none';
+    if (error) error.style.display = 'none';
+}
+
+function showAgentSuccess() {
+    const loading = document.querySelector('.agent-loading');
+    const success = document.querySelector('.agent-success');
+    const error = document.querySelector('.agent-error');
+    if (loading) loading.style.display = 'none';
+    if (success) success.style.display = 'flex';
+    if (error) error.style.display = 'none';
+}
+
+function showAgentError() {
+    const loading = document.querySelector('.agent-loading');
+    const success = document.querySelector('.agent-success');
+    const error = document.querySelector('.agent-error');
+    if (loading) loading.style.display = 'none';
+    if (success) success.style.display = 'none';
+    if (error) error.style.display = 'flex';
+}
+
+function hideAgentStatus() {
+    const loading = document.querySelector('.agent-loading');
+    const success = document.querySelector('.agent-success');
+    const error = document.querySelector('.agent-error');
+    if (loading) loading.style.display = 'none';
+    if (success) success.style.display = 'none';
+    if (error) error.style.display = 'none';
+}
+
+async function initializeAgent(commessa, collectionName) {
+    try {
+        // Show loading state
+        showAgentLoading();
+        
+        // Get selected model from UI
+        const modelSelected = document.querySelector('.model-selected');
+        const model = modelSelected ? modelSelected.textContent.trim() : 'gpt-4.1-nano';
+        
+        console.log('Initializing agent with:', { commessa, collectionName, model });
+        
+        const response = await fetch('/api/initialize-agent/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                commessa: commessa,
+                collection_name: collectionName,
+                model: model
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            activeCollection = {
+                commessa: commessa,
+                collection: collectionName,
+                model: model
+            };
+            console.log('Agent initialized successfully:', data);
+            // Show success message
+            showAgentSuccess();
+        } else {
+            console.error('Error initializing agent:', data.error);
+            alert('Errore nell\'inizializzazione dell\'agent: ' + data.error);
+            showAgentError();
+        }
+    } catch (error) {
+        console.error('Error initializing agent:', error);
+        alert('Errore di connessione: ' + error.message);
+        showAgentError();
+    }
+}
 
 function sanitizeCollectionName(name) {
     const sanitized = name.trim().replace(/\s+/g, '_');

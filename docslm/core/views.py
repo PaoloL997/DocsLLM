@@ -8,6 +8,9 @@ from django.conf import settings
 from django.shortcuts import render
 from django.http import JsonResponse
 
+# Global dictionary to store agent instances by session key
+AGENT_INSTANCES = {}
+
 
 def index(request):
     """Render the main page."""
@@ -22,19 +25,58 @@ def get_greeting(request):
 
 
 def send_message(request):
-    """Handle message submission."""
+    """Handle message submission and send to Agent."""
     if request.method == 'POST':
         import json
         data = json.loads(request.body)
         message = data.get('message', '')
-        model = data.get('model', 'Sonnet 4.5')
         
-        # Placeholder: In a real app, you would process the message here
-        return JsonResponse({
-            'success': True,
-            'message': 'Message received',
-            'model': model
-        })
+        # Check if there's an active agent in session
+        active_agent = request.session.get('active_agent')
+        
+        if not active_agent:
+            return JsonResponse({
+                'error': 'Nessun agent attivo. Seleziona un notebook prima di inviare un messaggio.'
+            }, status=400)
+        
+        # Get agent instance from memory
+        session_key = request.session.session_key
+        agent = AGENT_INSTANCES.get(session_key)
+        
+        if not agent:
+            return JsonResponse({
+                'error': 'Agent non trovato in memoria. Riseleziona il notebook.'
+            }, status=400)
+        
+        try:
+            # Invoke agent with user message
+            print(f"\n{'='*80}")
+            print(f"USER QUERY: {message}")
+            print(f"Commessa: {active_agent['commessa']}, Collection: {active_agent['collection']}, Model: {active_agent['model']}")
+            print(f"{'='*80}")
+            
+            response = agent.invoke(message)
+            
+            print(f"\nAGENT RESPONSE:")
+            print(response)
+            print(f"{'='*80}\n")
+            
+            # Extract only the text response from the agent result
+            response_text = response.get('response', '') if isinstance(response, dict) else str(response)
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Message processed by agent',
+                'response': response_text
+            })
+            
+        except Exception as e:
+            print(f"Error invoking agent: {e}")
+            import traceback
+            traceback.print_exc()
+            return JsonResponse({
+                'error': f'Errore durante l\'invocazione dell\'agent: {str(e)}'
+            }, status=500)
     
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -275,6 +317,81 @@ def create_collection(request):
         
     except Exception as e:
         print(f"Error creating collection: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def initialize_agent(request):
+    """Initialize agent for selected collection."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        commessa = data.get('commessa', '').strip()
+        collection_name = data.get('collection_name', '').strip()
+        model = data.get('model', 'gpt-4.1-nano').strip()
+        
+        if not commessa or not collection_name:
+            return JsonResponse({'error': 'Commessa and collection name are required'}, status=400)
+        
+        import sys
+        sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
+        from services.agent import Agent
+        from graphrag.store import Store
+        
+        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+        
+        if not os.path.exists(config_path):
+            return JsonResponse({'error': 'Configuration file not found'}, status=500)
+        
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        
+        # Create Store instance
+        db_name = f"comm_{commessa}"
+        store = Store(
+            uri=config.get('uri'),
+            database=db_name,
+            collection=collection_name,
+            k=config.get('k', 4),
+            embedding_model=config.get('embedding_model')
+        )
+        
+        # Create agent and store it in global dictionary
+        agent = Agent(store=store, model=model, rerank=True)
+        
+        # Store agent instance in memory indexed by session key
+        session_key = request.session.session_key
+        if not session_key:
+            request.session.create()
+            session_key = request.session.session_key
+        
+        AGENT_INSTANCES[session_key] = agent
+        
+        # Store agent metadata in session for reference
+        request.session['active_agent'] = {
+            'commessa': commessa,
+            'collection': collection_name,
+            'model': model
+        }
+        request.session.modified = True
+        
+        print(f"Agent created and stored for session {session_key}")
+        print(f"Commessa: {commessa}, Collection: {collection_name}, Model: {model}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Agent initialized successfully',
+            'commessa': commessa,
+            'collection': collection_name,
+            'model': model
+        })
+        
+    except Exception as e:
+        print(f"Error initializing agent: {e}")
+        import traceback
+        traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
 
 
