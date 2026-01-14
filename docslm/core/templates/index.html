@@ -146,6 +146,22 @@
         </div>
     </div>
 
+    <div id="createCollectionModal" class="create-collection-modal">
+        <div class="create-collection-content">
+            <div class="create-collection-header">
+                <span class="create-collection-title">Nome Collection</span>
+                <button class="create-collection-close" onclick="closeCreateCollectionModalFunc()">&times;</button>
+            </div>
+            <input type="text" id="collectionNameInput" class="create-collection-input" placeholder="Inserisci il nome della collection...">
+            <div class="create-collection-body">
+                <!-- spazio per contenuti futuri -->
+            </div>
+            <div class="create-collection-actions">
+                <button id="createCollectionConfirmBtn" class="create-collection-confirm">Crea</button>
+            </div>
+        </div>
+    </div>
+
     <script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>

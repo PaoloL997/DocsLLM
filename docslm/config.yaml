@@ -1,1 +1,5 @@
 path: Z:\Sistema Gestione Integrata\12_Elenco Commesse\MQ 8.2-05 Rev1_Elenco Commesse.xlsx
+
+uri: http://localhost:19530
+k: 4
+embedding_model: text-embedding-3-large

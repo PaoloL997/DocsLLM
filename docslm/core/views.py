@@ -171,6 +171,100 @@ def search_commesse(request):
     return JsonResponse({'results': mock_results})
 
 
+def list_collections(request):
+    """List collections for a selected commessa."""
+    commessa = request.GET.get('commessa', '').strip()
+    if not commessa:
+        return JsonResponse({'collections': []})
+    
+    try:
+        import sys
+        sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
+        from services.store import ManageDB
+        
+        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+        
+        if not os.path.exists(config_path):
+            return JsonResponse({'error': 'Configuration file not found'}, status=500)
+            
+        db_manager = ManageDB(config_path)
+        
+        # Try to list collections, if database doesn't exist, create it
+        try:
+            collections = db_manager.list_collections(commessa)
+        except Exception as e:
+            if 'database not found' in str(e).lower():
+                # Create the database and try again
+                db_manager.create_database(commessa)
+                collections = db_manager.list_collections(commessa)
+            else:
+                raise e
+        
+        # Format collections for frontend
+        formatted_collections = []
+        for collection_name in collections:
+            formatted_collections.append({
+                'name': collection_name,
+                'displayName': collection_name.replace('_', ' ').title(),
+                'commessa': commessa
+            })
+        
+        return JsonResponse({
+            'collections': formatted_collections,
+            'commessa': commessa
+        })
+        
+    except Exception as e:
+        print(f"Error listing collections: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def create_collection(request):
+    """Create a new collection in the specified commessa database."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        import json
+        data = json.loads(request.body)
+        commessa = data.get('commessa', '').strip()
+        collection_name = data.get('collection_name', '').strip()
+        
+        if not commessa or not collection_name:
+            return JsonResponse({'error': 'Commessa and collection name are required'}, status=400)
+        
+        # Sanitize collection name (replace spaces with underscores)
+        parts = [part for part in collection_name.split() if part]
+        collection_name = '_'.join(parts)
+        if not collection_name:
+            return JsonResponse({'error': 'Collection name is invalid'}, status=400)
+        
+        import sys
+        sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
+        from services.store import ManageDB
+        
+        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+        
+        if not os.path.exists(config_path):
+            return JsonResponse({'error': 'Configuration file not found'}, status=500)
+        
+        db_manager = ManageDB(config_path)
+        
+        # Create collection (this will create the database if it doesn't exist)
+        db_manager.create_collection(commessa, collection_name)
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Collection {collection_name} created successfully',
+            'commessa': commessa,
+            'collection_name': collection_name
+        })
+        
+    except Exception as e:
+        print(f"Error creating collection: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 def test_excel(request):
     """Test Excel file access - debugging endpoint."""
     try:

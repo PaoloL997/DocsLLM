@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadGreeting();
     setupEventListeners();
     initializeDropdown();
+    restoreSelectedCommessa();
 });
 
 function initializeDropdown() {
@@ -33,6 +34,8 @@ function setupEventListeners() {
     const usernameInput = document.getElementById('usernameInput');
     const jobModal = document.getElementById('jobModal');
     const closeModal = document.getElementById('closeModal');
+    const createCollectionModal = document.getElementById('createCollectionModal');
+    const createCollectionConfirmBtn = document.getElementById('createCollectionConfirmBtn');
 
     if (sidebar && sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
@@ -104,6 +107,30 @@ function setupEventListeners() {
         });
     }
 
+    // Modal click outside to close
+    if (createCollectionModal) {
+        createCollectionModal.addEventListener('click', (e) => {
+            if (e.target === createCollectionModal) {
+                closeCreateCollectionModalFunc();
+            }
+        });
+    }
+
+    // Enter key to create collection
+    const collectionInput = document.getElementById('collectionNameInput');
+    if (collectionInput) {
+        collectionInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitCreateCollection();
+            }
+        });
+    }
+
+    if (createCollectionConfirmBtn) {
+        createCollectionConfirmBtn.addEventListener('click', submitCreateCollection);
+    }
+
     if (closeModal && jobModal) {
         closeModal.addEventListener('click', () => {
             jobModal.classList.remove('open');
@@ -169,6 +196,8 @@ async function performSearch(query, autoOpen = false) {
     const resultsContainer = document.getElementById('searchResults');
     if (!query.trim()) {
         resultsContainer.innerHTML = '';
+        updateSelectedCommessaParam(null);
+        resultsContainer.classList.remove('job-selected');
         return;
     }
     
@@ -181,6 +210,18 @@ async function performSearch(query, autoOpen = false) {
         console.log('Search response:', data); // Debug log
         
         if (data.results) {
+            if (autoOpen) {
+                const normalizedQuery = query.replace(/\s+/g, '').toLowerCase();
+                const match = data.results.find(job => job.code && job.code.replace(/\s+/g, '').toLowerCase() === normalizedQuery);
+                if (match) {
+                    const searchInput = document.getElementById('sidebarSearchInput');
+                    if (searchInput) {
+                        searchInput.value = match.code;
+                    }
+                    showSelectedJob(match);
+                    return;
+                }
+            }
             renderSearchResults(data.results);
         } else if (data.error) {
             console.error('Search error:', data.error);
@@ -196,6 +237,7 @@ function renderSearchResults(results) {
     const container = document.getElementById('searchResults');
     if (!container) return;
     container.innerHTML = '';
+    container.classList.remove('job-selected');
     results.forEach(job => {
         const card = document.createElement('div');
         card.className = 'job-card';
@@ -230,6 +272,7 @@ function showSelectedJob(selectedJob) {
     if (!container) return;
     
     container.innerHTML = '';
+    container.classList.add('job-selected');
     const jobInfo = document.createElement('div');
     jobInfo.className = 'selected-job-info';
     
@@ -244,6 +287,211 @@ function showSelectedJob(selectedJob) {
     jobInfo.appendChild(title);
     jobInfo.appendChild(description);
     container.appendChild(jobInfo);
+
+    updateSelectedCommessaParam(selectedJob.code);
+    
+    // Load and display collections for this job
+    loadCollections(selectedJob.code, container);
+}
+
+async function loadCollections(commessaCode, container) {
+    try {
+        if (container) {
+            container.querySelectorAll('.collections-section, .collections-container').forEach((el) => el.remove());
+        }
+        const response = await fetch(`/api/list-collections/?commessa=${encodeURIComponent(commessaCode)}`);
+        const data = await response.json();
+        
+        if (data.collections) {
+            renderCollections(data.collections, container, commessaCode);
+        } else if (data.error) {
+            console.error('Collections error:', data.error);
+            // Show error message to user
+            const errorDiv = document.createElement('div');
+            errorDiv.style.padding = '12px';
+            errorDiv.style.color = 'red';
+            errorDiv.textContent = `Errore nel caricamento delle collezioni: ${data.error}`;
+            container.appendChild(errorDiv);
+        }
+    } catch (error) {
+        console.error('Error loading collections:', error);
+        // Show error message to user
+        const errorDiv = document.createElement('div');
+        errorDiv.style.padding = '12px';
+        errorDiv.style.color = 'red';
+        errorDiv.textContent = `Errore di connessione: ${error.message}`;
+        container.appendChild(errorDiv);
+    }
+}
+
+function renderCollections(collections, container, commessaCode) {
+    const section = document.createElement('div');
+    section.className = 'collections-section';
+
+    const createWrapper = document.createElement('div');
+    createWrapper.className = 'create-notebook-wrapper';
+
+    const createBtn = document.createElement('div');
+    createBtn.className = 'create-notebook-btn';
+    createBtn.innerHTML = `
+        <span class="create-notebook-text">Crea nuovo Notebook</span>
+        <div class="plus-icon">+</div>
+    `;
+
+    createBtn.addEventListener('click', () => {
+        openCreateCollectionModal(commessaCode);
+    });
+
+    createWrapper.appendChild(createBtn);
+
+    const list = document.createElement('div');
+    list.className = 'collections-list';
+
+    collections.forEach((collection) => {
+        const card = document.createElement('div');
+        card.className = 'collection-card';
+        card.innerHTML = `
+            <span class="collection-name">${collection.displayName}</span>
+            <svg class="collection-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14,2 14,8 20,8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10,9 9,9 8,9"></polyline>
+            </svg>
+        `;
+
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.collection-card').forEach((c) => c.classList.remove('selected'));
+            card.classList.add('selected');
+            console.log('Selected collection:', collection.name);
+        });
+
+        list.appendChild(card);
+    });
+
+    section.appendChild(createWrapper);
+    section.appendChild(list);
+
+    container.appendChild(section);
+}
+
+// Global variable for current commessa
+let currentCommessaCode = null;
+
+function sanitizeCollectionName(name) {
+    const sanitized = name.trim().replace(/\s+/g, '_');
+    return sanitized.length ? sanitized : '';
+}
+
+function submitCreateCollection() {
+    const input = document.getElementById('collectionNameInput');
+    const confirmBtn = document.getElementById('createCollectionConfirmBtn');
+    if (!input || !currentCommessaCode) {
+        return;
+    }
+
+    const rawName = input.value.trim();
+    if (!rawName) {
+        return;
+    }
+
+    const sanitizedName = sanitizeCollectionName(rawName);
+    if (!sanitizedName) {
+        return;
+    }
+
+    input.value = sanitizedName;
+
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+    }
+
+    createCollection(currentCommessaCode, sanitizedName)
+        .catch((error) => {
+            console.error('Error creating collection:', error);
+        })
+        .finally(() => {
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+            }
+        });
+}
+
+function updateSelectedCommessaParam(commessaCode) {
+    const url = new URL(window.location.href);
+    if (commessaCode) {
+        url.searchParams.set('commessa', commessaCode);
+    } else {
+        url.searchParams.delete('commessa');
+    }
+    window.history.replaceState({}, '', url);
+}
+
+function restoreSelectedCommessa() {
+    const params = new URLSearchParams(window.location.search);
+    const commessa = params.get('commessa');
+    if (!commessa) {
+        return;
+    }
+
+    const searchInput = document.getElementById('sidebarSearchInput');
+    if (searchInput) {
+        searchInput.value = commessa;
+    }
+
+    performSearch(commessa, true);
+}
+
+// Functions for Create Collection Modal
+function openCreateCollectionModal(commessaCode) {
+    currentCommessaCode = commessaCode;
+    const modal = document.getElementById('createCollectionModal');
+    const input = document.getElementById('collectionNameInput');
+    
+    if (modal && input) {
+        input.value = '';
+        modal.classList.add('open');
+        setTimeout(() => input.focus(), 200);
+    }
+}
+
+function closeCreateCollectionModalFunc() {
+    const modal = document.getElementById('createCollectionModal');
+    if (modal) {
+        modal.classList.remove('open');
+    }
+    currentCommessaCode = null;
+}
+
+async function createCollection(commessaCode, collectionName) {
+    try {
+        const response = await fetch('/api/create-collection/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                commessa: commessaCode,
+                collection_name: collectionName
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeCreateCollectionModalFunc();
+            setTimeout(() => {
+                window.location.reload();
+            }, 150);
+        } else {
+            alert('Errore nella creazione del notebook: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error creating collection:', error);
+        alert('Errore di connessione: ' + error.message);
+    }
 }
 
 function showJobDetails(job) {
