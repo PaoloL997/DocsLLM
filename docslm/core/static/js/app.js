@@ -203,12 +203,47 @@ function renderSearchResults(results) {
             <span class="job-card-number">${job.code}</span>
             <button class="job-info-btn" title="Informazioni">i</button>
         `;
+        
+        // Click handler per selezionare la commessa
+        card.addEventListener('click', (e) => {
+            // Evita che il click si propaghi se è stato cliccato il pulsante info
+            if (e.target.classList.contains('job-info-btn')) return;
+            
+            const searchInput = document.getElementById('sidebarSearchInput');
+            if (searchInput) {
+                searchInput.value = job.code;
+                // Mostra solo la commessa selezionata
+                showSelectedJob(job);
+            }
+        });
+        
         card.querySelector('.job-info-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             showJobDetails(job);
         });
         container.appendChild(card);
     });
+}
+
+function showSelectedJob(selectedJob) {
+    const container = document.getElementById('searchResults');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    const jobInfo = document.createElement('div');
+    jobInfo.className = 'selected-job-info';
+    
+    const title = document.createElement('div');
+    title.className = 'selected-job-title';
+    title.textContent = `Commessa: ${selectedJob.code}`;
+    
+    const description = document.createElement('div');
+    description.className = 'selected-job-description';
+    description.innerHTML = `Commessa destinata a <span class="field-value">${selectedJob.customer}</span> in carico allo stabilimento di <span class="field-value">${selectedJob.site}</span>. Scopo: <span class="field-value">${selectedJob.goal}</span> Project Manager incaricato: <span class="field-value">${selectedJob.project_manager}</span>. Stato: <span class="field-value">${selectedJob.status}</span> (<span class="field-value">${selectedJob.end_date}</span>).`;
+    
+    jobInfo.appendChild(title);
+    jobInfo.appendChild(description);
+    container.appendChild(jobInfo);
 }
 
 function showJobDetails(job) {
