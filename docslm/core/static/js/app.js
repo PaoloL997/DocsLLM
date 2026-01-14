@@ -144,7 +144,6 @@ function setupEventListeners() {
             }
         }
     });
-
     if (messageInput) {
         messageInput.addEventListener('input', function() {
             autoResizeTextarea(messageInput);
@@ -165,6 +164,7 @@ function setupEventListeners() {
             console.log('Settings clicked');
         });
     }
+                    
 
     if (modelSelect && modelMenu) {
         modelSelect.addEventListener('click', function(e) {
@@ -362,9 +362,19 @@ function renderCollections(collections, container, commessaCode) {
         `;
 
         card.addEventListener('click', () => {
+            // Check if this card is already selected BEFORE removing
+            const wasSelected = card.classList.contains('selected');
+            
+            // Remove selection from all cards
             document.querySelectorAll('.collection-card').forEach((c) => c.classList.remove('selected'));
-            card.classList.add('selected');
-            console.log('Selected collection:', collection.name);
+            
+            // If it wasn't selected, select it now
+            if (!wasSelected) {
+                card.classList.add('selected');
+                console.log('Selected collection:', collection.name);
+            } else {
+                console.log('Deselected collection:', collection.name);
+            }
         });
 
         list.appendChild(card);
@@ -378,6 +388,8 @@ function renderCollections(collections, container, commessaCode) {
 
 // Global variable for current commessa
 let currentCommessaCode = null;
+// Selected files in the create-collection modal
+let modalSelectedFiles = [];
 
 function sanitizeCollectionName(name) {
     const sanitized = name.trim().replace(/\s+/g, '_');
@@ -387,33 +399,74 @@ function sanitizeCollectionName(name) {
 function submitCreateCollection() {
     const input = document.getElementById('collectionNameInput');
     const confirmBtn = document.getElementById('createCollectionConfirmBtn');
+    const body = document.querySelector('.create-collection-body');
+    
+    console.log('submitCreateCollection called');
+    
     if (!input || !currentCommessaCode) {
+        console.log('Missing input or commessa code');
         return;
     }
 
     const rawName = input.value.trim();
     if (!rawName) {
+        console.log('Empty collection name');
         return;
     }
 
     const sanitizedName = sanitizeCollectionName(rawName);
     if (!sanitizedName) {
+        console.log('Invalid sanitized name');
         return;
     }
 
     input.value = sanitizedName;
 
+    // Immediately show loading state and disable inputs
+    if (input) {
+        input.disabled = true;
+        input.style.opacity = '0.6';
+        input.style.cursor = 'not-allowed';
+    }
+    
     if (confirmBtn) {
         confirmBtn.disabled = true;
+        confirmBtn.style.opacity = '0.6';
+        confirmBtn.style.cursor = 'not-allowed';
+        confirmBtn.textContent = 'Caricamento...';
+    }
+    
+    if (body) {
+        body.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:60px 40px;height:100%;">
+                <div style="width:48px;height:48px;border:4px solid rgba(212, 112, 77, 0.2);border-top:4px solid var(--accent-color);border-radius:50%;animation:spin 1s linear infinite;"></div>
+                <div style="text-align:center;">
+                    <div style="font-size:16px;font-weight:600;color:var(--text-color);margin-bottom:8px;">Creazione in corso...</div>
+                    <div style="font-size:13px;color:var(--text-light);">Processing documenti e creazione collection</div>
+                </div>
+            </div>
+            <style>
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            </style>
+        `;
     }
 
+    // Call createCollection without finally() - let it handle button state
     createCollection(currentCommessaCode, sanitizedName)
         .catch((error) => {
             console.error('Error creating collection:', error);
-        })
-        .finally(() => {
+            if (input) {
+                input.disabled = false;
+                input.style.opacity = '1';
+                input.style.cursor = 'text';
+            }
             if (confirmBtn) {
                 confirmBtn.disabled = false;
+                confirmBtn.style.opacity = '1';
+                confirmBtn.style.cursor = 'pointer';
+                confirmBtn.textContent = 'Crea';
             }
         });
 }
@@ -451,6 +504,11 @@ function openCreateCollectionModal(commessaCode) {
     
     if (modal && input) {
         input.value = '';
+        // reset selected files and update counter
+        modalSelectedFiles = [];
+        renderSelectedFilesCounter();
+        // load job files for this commessa into the modal browser
+        loadJobFiles(commessaCode, '');
         modal.classList.add('open');
         setTimeout(() => input.focus(), 200);
     }
@@ -462,10 +520,44 @@ function closeCreateCollectionModalFunc() {
         modal.classList.remove('open');
     }
     currentCommessaCode = null;
+    modalSelectedFiles = [];
 }
 
 async function createCollection(commessaCode, collectionName) {
+    console.log('createCollection called with:', { commessaCode, collectionName, files: modalSelectedFiles });
+    
+    const confirmBtn = document.getElementById('createCollectionConfirmBtn');
+    const body = document.querySelector('.create-collection-body');
+    
+    console.log('Elements found:', { confirmBtn: !!confirmBtn, body: !!body });
+    
     try {
+        // Disable button and show loading state
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = '0.6';
+            confirmBtn.style.cursor = 'not-allowed';
+        }
+        
+        // Show loading message immediately
+        if (body) {
+            body.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:60px 40px;height:100%;">
+                    <div style="width:48px;height:48px;border:4px solid rgba(212, 112, 77, 0.2);border-top:4px solid var(--accent-color);border-radius:50%;animation:spin 1s linear infinite;"></div>
+                    <div style="text-align:center;">
+                        <div style="font-size:16px;font-weight:600;color:var(--text-color);margin-bottom:8px;">Creazione in corso...</div>
+                        <div style="font-size:13px;color:var(--text-light);">Processing documenti e creazione collection</div>
+                    </div>
+                </div>
+                <style>
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+                </style>
+            `;
+            console.log('Loading spinner shown');
+        }
+        
         const response = await fetch('/api/create-collection/', {
             method: 'POST',
             headers: {
@@ -474,23 +566,57 @@ async function createCollection(commessaCode, collectionName) {
             },
             body: JSON.stringify({
                 commessa: commessaCode,
-                collection_name: collectionName
+                collection_name: collectionName,
+                files: modalSelectedFiles
             })
         });
         
+        console.log('Response received:', response.status);
         const data = await response.json();
+        console.log('Response data:', data);
         
         if (data.success) {
-            closeCreateCollectionModalFunc();
+            // Show success message
+            if (body) {
+                body.innerHTML = `
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:60px 40px;height:100%;text-align:center;">
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        <div>
+                            <div style="font-size:16px;font-weight:600;color:var(--text-color);margin-bottom:4px;">Creazione completata!</div>
+                            <div style="font-size:13px;color:var(--text-light);">Notebook creato con successo</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
             setTimeout(() => {
+                closeCreateCollectionModalFunc();
                 window.location.reload();
-            }, 150);
+            }, 1500);
         } else {
-            alert('Errore nella creazione del notebook: ' + data.error);
+            // Show error message
+            if (body) {
+                body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore:</strong> ${data.error}</div>`;
+            }
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = '1';
+                confirmBtn.style.cursor = 'pointer';
+            }
         }
     } catch (error) {
         console.error('Error creating collection:', error);
-        alert('Errore di connessione: ' + error.message);
+        if (body) {
+            body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore di connessione:</strong> ${error.message}</div>`;
+        }
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+        }
     }
 }
 
@@ -524,6 +650,176 @@ function autoResizeTextarea(textarea) {
     if (!textarea) return;
     textarea.style.height = 'auto';
     textarea.style.height = (textarea.scrollHeight) + 'px';
+}
+
+// --- Job files browser in modal ---
+async function loadJobFiles(commessa, subpath = '') {
+    const body = document.querySelector('.create-collection-body');
+    if (!body) return;
+    console.log('loadJobFiles called', { commessa, subpath });
+    body.innerHTML = `<div style="padding:12px;color:var(--text-light)">Caricamento file...</div>`;
+    try {
+        const url = `/api/list-job-files/?commessa=${encodeURIComponent(commessa)}&subpath=${encodeURIComponent(subpath)}`;
+        console.log('fetch url', url);
+        const resp = await fetch(url);
+        const data = await resp.json();
+        console.log('list-job-files response', data);
+        if (data.error) {
+            body.innerHTML = `<div style="padding:12px;color:red">Errore: ${data.error}</div>`;
+            return;
+        }
+        renderJobFileBrowser(data);
+    } catch (err) {
+        console.error('loadJobFiles error', err);
+        body.innerHTML = `<div style="padding:12px;color:red">Errore di connessione</div>`;
+    }
+}
+
+function renderSelectedFilesCounter() {
+    const headerTitle = document.querySelector('.create-collection-title');
+    if (!headerTitle) return;
+    // show count on the right
+    let badge = document.getElementById('selectedFilesBadge');
+    if (!badge) {
+        badge = document.createElement('span');
+        badge.id = 'selectedFilesBadge';
+        badge.style.fontSize = '12px';
+        badge.style.color = 'var(--text-light)';
+        badge.style.marginLeft = '8px';
+        headerTitle.parentNode.appendChild(badge);
+    }
+    badge.textContent = modalSelectedFiles.length ? `${modalSelectedFiles.length} file selezionati` : '';
+}
+
+function renderJobFileBrowser(data) {
+    const body = document.querySelector('.create-collection-body');
+    if (!body) return;
+    body.innerHTML = '';
+
+    const subpath = data.subpath || '';
+
+    // Breadcrumbs
+    const bc = document.createElement('div');
+    bc.className = 'jobfiles-breadcrumbs';
+    bc.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:16px;padding:8px 12px;background:var(--secondary-color);border-radius:6px;font-size:13px;font-weight:500;color:var(--text-color);border:1px solid var(--border-color);flex-wrap:wrap;';
+
+    const rootLink = document.createElement('a');
+    rootLink.href = '#';
+    rootLink.textContent = data.commessa;
+    rootLink.style.cssText = 'color:var(--accent-color);text-decoration:none;transition:opacity 0.2s;';
+    rootLink.addEventListener('click', (e) => { e.preventDefault(); loadJobFiles(data.commessa, ''); });
+    rootLink.addEventListener('mouseenter', (e) => e.target.style.opacity = '0.7');
+    rootLink.addEventListener('mouseleave', (e) => e.target.style.opacity = '1');
+    bc.appendChild(rootLink);
+
+    if (subpath) {
+        const parts = subpath.split('/').filter(Boolean);
+        let accum = '';
+        parts.forEach((p) => {
+            accum = accum ? (accum + '/' + p) : p;
+            const sep = document.createElement('span');
+            sep.textContent = '/';
+            sep.style.cssText = 'color:var(--text-light);margin:0 2px;';
+            bc.appendChild(sep);
+            const link = document.createElement('a');
+            link.href = '#';
+            link.textContent = p;
+            link.style.cssText = 'color:var(--accent-color);text-decoration:none;transition:opacity 0.2s;';
+            link.addEventListener('click', (e) => { e.preventDefault(); loadJobFiles(data.commessa, accum); });
+            link.addEventListener('mouseenter', (e) => e.target.style.opacity = '0.7');
+            link.addEventListener('mouseleave', (e) => e.target.style.opacity = '1');
+            bc.appendChild(link);
+        });
+    }
+
+    body.appendChild(bc);
+
+    if (!data.entries || data.entries.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.cssText = 'display:flex;align-items:center;justify-content:center;padding:40px 12px;color:var(--text-light);font-size:14px;';
+        empty.textContent = 'Nessun file o cartella in questa posizione.';
+        body.appendChild(empty);
+        return;
+    }
+
+    const listWrap = document.createElement('div');
+    listWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+
+    // Folders first
+    data.entries.filter(e => e.is_dir).forEach(entry => {
+        const row = document.createElement('div');
+        row.className = 'jobfile-row jobfile-folder';
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border-color);border-radius:6px;background:var(--secondary-color);cursor:pointer;transition:all 0.2s;';
+        
+        row.addEventListener('mouseenter', () => {
+            row.style.background = 'var(--button-bg)';
+            row.style.borderColor = 'var(--accent-color)';
+            row.style.transform = 'translateX(2px)';
+        });
+        row.addEventListener('mouseleave', () => {
+            row.style.background = 'var(--secondary-color)';
+            row.style.borderColor = 'var(--border-color)';
+            row.style.transform = 'translateX(0)';
+        });
+
+        const left = document.createElement('div');
+        left.style.cssText = 'display:flex;align-items:center;gap:10px;';
+        left.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg><span style="font-size:14px;font-weight:500;color:var(--text-color);">${entry.name}</span>`;
+        row.appendChild(left);
+
+        const arrow = document.createElement('div');
+        arrow.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="2"><path d="M9 18l6-6-6-6"></path></svg>';
+        arrow.style.cssText = 'display:flex;align-items:center;transition:transform 0.2s;';
+        row.appendChild(arrow);
+
+        row.addEventListener('click', () => {
+            const newSub = subpath ? (subpath + '/' + entry.name) : entry.name;
+            loadJobFiles(data.commessa, newSub);
+        });
+        
+        listWrap.appendChild(row);
+    });
+
+    // Files
+    data.entries.filter(e => !e.is_dir).forEach(entry => {
+        const row = document.createElement('div');
+        row.className = 'jobfile-row jobfile-file';
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border-color);border-radius:6px;background:var(--secondary-color);transition:all 0.2s;';
+        
+        row.addEventListener('mouseenter', () => {
+            row.style.background = 'var(--button-bg)';
+        });
+        row.addEventListener('mouseleave', () => {
+            row.style.background = 'var(--secondary-color)';
+        });
+
+        const left = document.createElement('div');
+        left.style.cssText = 'display:flex;align-items:center;gap:10px;flex:1;';
+        left.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg><span style="font-size:14px;color:var(--text-color);">${entry.name}</span>`;
+        row.appendChild(left);
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.style.cssText = 'width:18px;height:18px;cursor:pointer;accent-color:var(--accent-color);';
+        const relPath = subpath ? (subpath + '/' + entry.name) : entry.name;
+        checkbox.dataset.path = relPath;
+        checkbox.addEventListener('change', (e) => {
+            const p = e.target.dataset.path;
+            if (e.target.checked) {
+                if (!modalSelectedFiles.includes(p)) modalSelectedFiles.push(p);
+            } else {
+                modalSelectedFiles = modalSelectedFiles.filter(x => x !== p);
+            }
+            renderSelectedFilesCounter();
+        });
+        checkbox.addEventListener('click', (e) => e.stopPropagation());
+
+        row.appendChild(checkbox);
+        listWrap.appendChild(row);
+    });
+
+    body.appendChild(listWrap);
+    renderSelectedFilesCounter();
 }
 
 function openModelDropdown() {

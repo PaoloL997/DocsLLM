@@ -250,14 +250,27 @@ def create_collection(request):
         
         db_manager = ManageDB(config_path)
         
-        # Create collection (this will create the database if it doesn't exist)
-        db_manager.create_collection(commessa, collection_name)
+        # Optional: files selected by user (relative paths)
+        selected_files = data.get('files', []) if isinstance(data, dict) else []
         
+        # Convert relative paths to absolute paths
+        full_paths = []
+        if selected_files:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f)
+            jobs_base = config.get('jobs', '')
+            for rel_path in selected_files:
+                full_path = os.path.join(jobs_base, commessa, rel_path)
+                full_paths.append(full_path)
+        
+        # Create collection (this will create the database if it doesn't exist)
+        db_manager.create_collection(commessa, collection_name, files=full_paths)
         return JsonResponse({
             'success': True,
             'message': f'Collection {collection_name} created successfully',
             'commessa': commessa,
-            'collection_name': collection_name
+            'collection_name': collection_name,
+            'selected_files': full_paths
         })
         
     except Exception as e:
@@ -265,42 +278,71 @@ def create_collection(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-def test_excel(request):
-    """Test Excel file access - debugging endpoint."""
+def list_job_files(request):
+    """List files and folders under the configured jobs path for a commessa.
+    GET params: commessa (required), subpath (optional, relative inside commessa)
+    """
+    commessa = request.GET.get('commessa', '').strip()
+    subpath = request.GET.get('subpath', '').strip()
     try:
         config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-        
-        excel_path = config.get('path')
-        
-        result = {
-            'config_path': config_path,
-            'config_exists': os.path.exists(config_path),
-            'excel_path': excel_path,
-            'excel_exists': os.path.exists(excel_path) if excel_path else False,
-        }
-        
-        if excel_path and os.path.exists(excel_path):
+        if not os.path.exists(config_path):
+            return JsonResponse({'error': 'Configuration file not found'}, status=500)
+
+        with open(config_path, 'r', encoding='utf-8') as f:
+            cfg = yaml.safe_load(f)
+
+        jobs_base = cfg.get('jobs')
+        if not jobs_base:
+            return JsonResponse({'error': 'Jobs path not configured'}, status=500)
+
+        # Build target path: jobs_base / commessa / subpath
+        target_base = os.path.abspath(jobs_base)
+        target = os.path.join(target_base, commessa)
+        if subpath:
+            # normalize and prevent traversal
+            safe_sub = os.path.normpath(subpath).lstrip(os.sep).lstrip('/')
+            target = os.path.join(target, safe_sub)
+
+        target = os.path.abspath(target)
+
+        # Security: ensure target is inside jobs_base
+        if not target.startswith(target_base):
+            return JsonResponse({'error': 'Invalid path'}, status=400)
+
+        if not os.path.exists(target):
+            return JsonResponse({'error': 'Path not found', 'path': target}, status=404)
+
+        entries = []
+        for name in sorted(os.listdir(target)):
+            full = os.path.join(target, name)
             try:
-                import pandas as pd
-                df = pd.read_excel(excel_path)
-                result.update({
-                    'pandas_success': True,
-                    'rows': len(df),
-                    'columns': list(df.columns[:10]),  # Prime 10 colonne
-                    'first_5_rows': df.head().to_dict('records')  # Prime 5 righe per vedere la struttura
+                stat = os.stat(full)
+                entries.append({
+                    'name': name,
+                    'is_dir': os.path.isdir(full),
+                    'size': stat.st_size,
+                    'mtime': stat.st_mtime
                 })
-            except Exception as e:
-                result.update({
-                    'pandas_success': False,
-                    'pandas_error': str(e)
-                })
+            except Exception:
+                # ignore unreadable
+                continue
+
+        # parent relative path for breadcrumb
+        rel_parent = ''
+        rel_target = os.path.relpath(target, os.path.join(target_base, commessa)).replace('\\', '/')
+        if rel_target == '.':
+            rel_target = ''
         else:
-            result['message'] = 'File Excel non trovato o non accessibile'
-            
-        return JsonResponse(result)
-        
+            rel_target = rel_target
+
+        return JsonResponse({
+            'base_jobs': target_base,
+            'commessa': commessa,
+            'subpath': rel_target,
+            'entries': entries
+        })
     except Exception as e:
+        print(f"Error listing job files: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 

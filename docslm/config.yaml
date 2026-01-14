@@ -1,4 +1,5 @@
 path: Z:\Sistema Gestione Integrata\12_Elenco Commesse\MQ 8.2-05 Rev1_Elenco Commesse.xlsx
+jobs: Z:\JOBS
 
 uri: http://localhost:19530
 k: 4

@@ -7,12 +7,18 @@ readme = "README.md"
 packages = [{ include = "docslm" }]
 
 [tool.poetry.dependencies]
-python = ">=3.13,<4.0.0"
+python = ">=3.13,<3.14"
 django = ">=6.0.1,<7.0.0"
 openpyxl = ">=3.1.5,<4.0.0"
 pandas = ">=2.3.3,<3.0.0"
 pyyaml = ">=6.0.3,<7.0.0"
 graphrag = { git = "git@github.com:PaoloL997/graphrag.git", rev = "main" }
+duckling = { git = "git@github.com:PaoloL997/duckling.git", rev = "main" }
+
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu129"
+priority = "supplemental"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

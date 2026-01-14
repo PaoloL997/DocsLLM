@@ -1,3 +1,4 @@
+import json
 import yaml
 
 from graphrag.store import (
@@ -8,6 +9,7 @@ from graphrag.store import (
 )
 from langchain_core.documents import Document
 from pymilvus import Collection, MilvusException, connections, db, utility
+from .process import Process
 
 class ManageDB:
     def __init__(self, config: str):
@@ -25,7 +27,12 @@ class ManageDB:
         db_name = f"comm_{database}"
         return create_database(self.config.get("uri"), db_name)
     
-    def create_collection(self, database: str, collection: str):
+    def create_collection(
+            self,
+            database: str,
+            collection: str,
+            files: list = None
+            ):
         uri = self.config.get("uri")
         db_name = f"comm_{database}"
 
@@ -71,7 +78,30 @@ class ManageDB:
             collection_obj.load()
             collection_obj.delete(expr='namespace == "__init__"')
             collection_obj.flush()
+            
+            # Save selected files as collection properties
+            if files:
+                collection_obj.set_properties({"files": json.dumps(files)})
+            
             collection_obj.release()
+            
+            # Process and add documents if files are provided
+            if files:
+                print(f"Processing {len(files)} files...")
+                processor = Process()
+                docs = processor.process(files)
+                print(f"Processed {len(docs)} documents")
+                
+                # Add processed documents to the store
+                store.add(docs)
+                print(f"Added {len(docs)} documents to collection {collection}")
+                
+                # Flush and load collection to make documents visible
+                collection_obj = Collection(collection)
+                collection_obj.flush()
+                collection_obj.load()
+                print(f"Collection {collection} flushed and loaded")
+            
         except MilvusException as exc:
             raise RuntimeError(f"Failed to create collection {collection}: {exc}") from exc
 
