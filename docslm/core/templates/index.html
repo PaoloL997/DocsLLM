@@ -65,6 +65,8 @@
                 <h1 class="greeting-text" id="greeting">Accedi al tuo account</h1>
             </div>
 
+            <div class="chat-history" id="chatHistory"></div>
+
             <section class="chat-card">
                 <div class="chat-card-input">
                     <textarea
@@ -78,7 +80,6 @@
                 <div class="chat-card-footer">
                     <div class="chat-controls-left">
                         <div class="agent-status" id="agentStatus">
-                            <!-- Loading spinner -->
                             <div class="agent-loading" style="display: none;">
                                 <svg class="spinner-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="10" opacity="0.25"></circle>
@@ -86,11 +87,12 @@
                                 </svg>
                                 <span class="agent-text">Caricamento agente...</span>
                             </div>
-                            <!-- Success message -->
+                            <div class="agent-inactive" style="display: flex;">
+                                <span class="agent-text">Scegli una commessa ed un notebook</span>
+                            </div>
                             <div class="agent-success" style="display: none;">
                                 <span class="agent-text">Agente caricato correttamente</span>
                             </div>
-                            <!-- Error message -->
                             <div class="agent-error" style="display: none;">
                                 <span class="agent-text">Errore durante il caricamento dell'agente</span>
                             </div>

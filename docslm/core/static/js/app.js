@@ -2,6 +2,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     loadGreeting();
     setupEventListeners();
+    // disable send until an agent/collection is selected
+    disableSendButton();
     initializeDropdown();
     restoreSelectedCommessa();
 });
@@ -378,7 +380,8 @@ function renderCollections(collections, container, commessaCode) {
             } else {
                 console.log('Deselected collection:', collection.name);
                 activeCollection = null;
-                hideAgentStatus();
+                showAgentInactive();
+                disableSendButton();
             }
         });
 
@@ -402,36 +405,69 @@ function showAgentLoading() {
     const loading = document.querySelector('.agent-loading');
     const success = document.querySelector('.agent-success');
     const error = document.querySelector('.agent-error');
+    const inactive = document.querySelector('.agent-inactive');
     if (loading) loading.style.display = 'flex';
     if (success) success.style.display = 'none';
     if (error) error.style.display = 'none';
+    if (inactive) inactive.style.display = 'none';
 }
 
 function showAgentSuccess() {
     const loading = document.querySelector('.agent-loading');
     const success = document.querySelector('.agent-success');
     const error = document.querySelector('.agent-error');
+    const inactive = document.querySelector('.agent-inactive');
     if (loading) loading.style.display = 'none';
     if (success) success.style.display = 'flex';
     if (error) error.style.display = 'none';
+    if (inactive) inactive.style.display = 'none';
 }
 
 function showAgentError() {
     const loading = document.querySelector('.agent-loading');
     const success = document.querySelector('.agent-success');
     const error = document.querySelector('.agent-error');
+    const inactive = document.querySelector('.agent-inactive');
     if (loading) loading.style.display = 'none';
     if (success) success.style.display = 'none';
     if (error) error.style.display = 'flex';
+    if (inactive) inactive.style.display = 'none';
+}
+
+function showAgentInactive() {
+    const loading = document.querySelector('.agent-loading');
+    const success = document.querySelector('.agent-success');
+    const error = document.querySelector('.agent-error');
+    const inactive = document.querySelector('.agent-inactive');
+    if (loading) loading.style.display = 'none';
+    if (success) success.style.display = 'none';
+    if (error) error.style.display = 'none';
+    if (inactive) inactive.style.display = 'flex';
 }
 
 function hideAgentStatus() {
     const loading = document.querySelector('.agent-loading');
     const success = document.querySelector('.agent-success');
     const error = document.querySelector('.agent-error');
+    const inactive = document.querySelector('.agent-inactive');
     if (loading) loading.style.display = 'none';
     if (success) success.style.display = 'none';
     if (error) error.style.display = 'none';
+    if (inactive) inactive.style.display = 'none';
+}
+
+function enableSendButton() {
+    const sendBtn = document.getElementById('sendBtn');
+    if (!sendBtn) return;
+    sendBtn.removeAttribute('disabled');
+    sendBtn.classList.remove('disabled');
+}
+
+function disableSendButton() {
+    const sendBtn = document.getElementById('sendBtn');
+    if (!sendBtn) return;
+    sendBtn.setAttribute('disabled', 'true');
+    sendBtn.classList.add('disabled');
 }
 
 async function initializeAgent(commessa, collectionName) {
@@ -469,15 +505,20 @@ async function initializeAgent(commessa, collectionName) {
             console.log('Agent initialized successfully:', data);
             // Show success message
             showAgentSuccess();
+            // enable sending now that an agent is active
+            enableSendButton();
         } else {
             console.error('Error initializing agent:', data.error);
             alert('Errore nell\'inizializzazione dell\'agent: ' + data.error);
             showAgentError();
+            // keep send disabled
+            disableSendButton();
         }
     } catch (error) {
         console.error('Error initializing agent:', error);
         alert('Errore di connessione: ' + error.message);
         showAgentError();
+        disableSendButton();
     }
 }
 
@@ -936,15 +977,214 @@ function selectModel(value, title) {
     document.querySelectorAll('.model-option').forEach(opt => {
         opt.classList.toggle('selected', opt.dataset.value === value);
     });
+    
+    // If there's an active agent, reinitialize it with the new model
+    if (activeCollection) {
+        console.log('Reinitializing agent with new model:', value);
+        initializeAgent(activeCollection.commessa, activeCollection.collection);
+    }
+}
+
+function ensureChatVisible() {
+    const chatHistory = document.getElementById('chatHistory');
+    const greetingSection = document.querySelector('.greeting-section');
+    const chatCard = document.querySelector('.chat-card');
+    if (greetingSection) greetingSection.style.display = 'none';
+    if (chatHistory) chatHistory.classList.add('active');
+    if (chatCard) {
+        chatCard.classList.add('fixed');
+        // align composer with the center of the `.container` so messages and textarea stay aligned
+        const container = document.querySelector('.container');
+        function alignChatCard() {
+            if (!chatCard) return;
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                // set left in viewport pixels and translate to center
+                chatCard.style.left = `${centerX}px`;
+                chatCard.style.transform = 'translateX(-50%)';
+            } else {
+                chatCard.style.left = '50%';
+                chatCard.style.transform = 'translateX(-50%)';
+            }
+        }
+
+        // align now and on resize (keeps centered if window/container changes)
+        alignChatCard();
+        window.addEventListener('resize', alignChatCard);
+    }
+}
+
+function appendMessage(role, text) {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return null;
+    const row = document.createElement('div');
+    row.className = `chat-row ${role}`;
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    // render markdown only for assistant, plain text for user
+    if (role === 'assistant') {
+        bubble.innerHTML = renderMarkdown(text || '');
+    } else {
+        bubble.textContent = text;
+    }
+    row.appendChild(bubble);
+    chatHistory.appendChild(row);
+    
+    // Scroll to show the new message at the top of the viewport
+    setTimeout(() => {
+        const rect = row.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const targetScroll = scrollTop + rect.top - 40;
+        window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    }, 100);
+    
+    return row;
+}
+
+// Basic, safe Markdown -> HTML renderer (supports headings, bold, italic, inline code, code blocks, lists, links)
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
+}
+
+function renderMarkdown(md) {
+    if (!md) return '';
+    // Normalize line endings
+    md = md.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    // Extract code blocks ```lang\n...```
+    const codeBlocks = [];
+    md = md.replace(/```([\s\S]*?)```/g, function(_, code) {
+        const id = `@@CODEBLOCK${codeBlocks.length}@@`;
+        codeBlocks.push(code);
+        return id;
+    });
+
+    // Escape now
+    let out = escapeHtml(md);
+
+    // Headings
+    out = out.replace(/^######\s?(.*)$/gm, '<h6>$1</h6>');
+    out = out.replace(/^#####\s?(.*)$/gm, '<h5>$1</h5>');
+    out = out.replace(/^####\s?(.*)$/gm, '<h4>$1</h4>');
+    out = out.replace(/^###\s?(.*)$/gm, '<h3>$1</h3>');
+    out = out.replace(/^##\s?(.*)$/gm, '<h2>$1</h2>');
+    out = out.replace(/^#\s?(.*)$/gm, '<h1>$1</h1>');
+
+    // Bold **text** and __text__
+    out = out.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    out = out.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+    // Italic *text* or _text_
+    out = out.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    out = out.replace(/_(.*?)_/g, '<em>$1</em>');
+
+    // Inline code `code`
+    out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Links [text](url)
+    out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(_, text, url){
+        const safeUrl = escapeHtml(url);
+        return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+    });
+
+    // Unordered lists
+    out = out.replace(/^\s*[-\*]\s+(.*)$/gm, '<li>$1</li>');
+    out = out.replace(/(<li>[\s\S]*?<\/li>)/g, function(m){
+        return m.indexOf('<ul>') === -1 ? `<ul>${m}</ul>` : m;
+    });
+
+    // Ordered lists
+    out = out.replace(/^\s*\d+\.\s+(.*)$/gm, '<li>$1</li>');
+    out = out.replace(/(<li>[\s\S]*?<\/li>)/g, function(m){
+        return m.indexOf('<ol>') === -1 ? `<ol>${m}</ol>` : m;
+    });
+
+    // Paragraphs: split on double newline
+    out = out.split('\n\n').map(function(para){
+        if (/^<h[1-6]>/i.test(para) || /^<ul>/i.test(para) || /^<ol>/i.test(para) || /^<pre>/i.test(para)) return para;
+        return `<p>${para.replace(/\n/g, '<br>')}</p>`;
+    }).join('\n');
+
+    // Restore code blocks
+    out = out.replace(/@@CODEBLOCK(\d+)@@/g, function(_, idx){
+        const code = escapeHtml(codeBlocks[parseInt(idx,10)]);
+        return `<pre><code>${code}</code></pre>`;
+    });
+
+    return out;
+}
+
+function appendLoader() {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return null;
+    const row = document.createElement('div');
+    row.className = 'chat-row assistant';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble loader';
+
+    // small pulsing icon using same visual language as .greeting-icon
+    const icon = document.createElement('span');
+    icon.className = 'bubble-think-icon';
+    icon.textContent = '✱';
+
+    const timer = document.createElement('span');
+    timer.className = 'loader-timer';
+    timer.textContent = '0s';
+
+    bubble.appendChild(icon);
+    bubble.appendChild(timer);
+    row.appendChild(bubble);
+    chatHistory.appendChild(row);
+
+    // start timer (seconds)
+    const start = Date.now();
+    // update every 50ms to include milliseconds in display
+    const interval = setInterval(() => {
+        const elapsedMs = Date.now() - start;
+        const elapsedSec = (elapsedMs / 1000).toFixed(3);
+        timer.textContent = `${elapsedSec}s`;
+    }, 50);
+    // store reference so callers can clear it
+    row._timer = interval;
+
+    // ensure newest loader is visible (we scroll main so loader is in view)
+    setTimeout(() => {
+        const rect = row.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const targetScroll = scrollTop + rect.top - 40;
+        window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    }, 50);
+
+    return row;
 }
 
 async function sendMessage() {
+    if (!activeCollection) {
+        showAgentInactive();
+        return;
+    }
     const messageInput = document.getElementById('messageInput');
     const modelSelected = document.querySelector('.model-selected');
     const message = messageInput ? messageInput.value.trim() : '';
     const model = modelSelected ? modelSelected.textContent : '';
 
     if (!message) return;
+
+    ensureChatVisible();
+    const userRow = appendMessage('user', message);
+    // clear input immediately after sending so the textarea shows placeholder
+    if (messageInput) {
+        messageInput.value = '';
+        autoResizeTextarea(messageInput);
+        messageInput.blur();
+    }
+    const loaderRow = appendLoader();
 
     try {
         const response = await fetch('/api/send-message/', {
@@ -957,11 +1197,51 @@ async function sendMessage() {
         });
         const data = await response.json();
         if (data.success) {
-            messageInput.value = '';
-            autoResizeTextarea(messageInput);
+            // input already cleared earlier
+            if (loaderRow) {
+                if (loaderRow._timer) clearInterval(loaderRow._timer);
+                loaderRow.remove();
+            }
+            appendMessage('assistant', data.response || '');
+            // after assistant response, ensure the user's question is the first visible
+            if (userRow) {
+                setTimeout(() => {
+                    const rect = userRow.getBoundingClientRect();
+                    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                    const targetScroll = scrollTop + rect.top - 40; // 40px top offset
+                    window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+                }, 100);
+            }
+        } else {
+            if (loaderRow) {
+                if (loaderRow._timer) clearInterval(loaderRow._timer);
+                loaderRow.remove();
+            }
+            appendMessage('assistant', data.error || 'Errore durante la richiesta');
+            if (userRow) {
+                setTimeout(() => {
+                    const rect = userRow.getBoundingClientRect();
+                    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                    const targetScroll = scrollTop + rect.top - 40;
+                    window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+                }, 100);
+            }
         }
     } catch (error) {
         console.error('Error sending message:', error);
+        if (loaderRow) {
+            if (loaderRow._timer) clearInterval(loaderRow._timer);
+            loaderRow.remove();
+        }
+        appendMessage('assistant', 'Errore di rete, riprova.');
+        if (userRow) {
+            setTimeout(() => {
+                const rect = userRow.getBoundingClientRect();
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                const targetScroll = scrollTop + rect.top - 40;
+                window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+            }, 100);
+        }
     }
 }
 
