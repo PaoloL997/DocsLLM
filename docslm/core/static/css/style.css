@@ -1354,6 +1354,108 @@ html, body {
     transform: translateY(-1px);
 }
 
+/* Markdown formatting in assistant messages */
+.chat-bubble h1, .chat-bubble h2, .chat-bubble h3,
+.chat-bubble h4, .chat-bubble h5, .chat-bubble h6 {
+    margin: 16px 0 8px 0;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.chat-bubble h1 { font-size: 24px; }
+.chat-bubble h2 { font-size: 20px; }
+.chat-bubble h3 { font-size: 18px; }
+.chat-bubble h4 { font-size: 16px; }
+.chat-bubble h5 { font-size: 14px; }
+.chat-bubble h6 { font-size: 13px; }
+
+.chat-bubble p {
+    margin: 8px 0;
+    line-height: 1.6;
+}
+
+.chat-bubble code {
+    background-color: #f5f3f0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Fira Mono', monospace;
+    font-size: 13px;
+    color: #d4704d;
+}
+
+.chat-bubble pre {
+    background-color: #f5f3f0;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0;
+    overflow-x: auto;
+}
+
+.chat-bubble pre code {
+    background: none;
+    padding: 0;
+    color: var(--text-color);
+    font-size: 13px;
+}
+
+.chat-bubble ul, .chat-bubble ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.chat-bubble li {
+    margin: 4px 0;
+    line-height: 1.5;
+}
+
+.chat-bubble blockquote {
+    border-left: 3px solid var(--accent-color);
+    padding-left: 12px;
+    margin: 12px 0;
+    color: var(--text-light);
+    font-style: italic;
+}
+
+.chat-bubble a {
+    color: var(--accent-color);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.chat-bubble a:hover {
+    border-bottom-color: var(--accent-color);
+}
+
+.chat-bubble .md-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+}
+
+.chat-bubble .md-table th,
+.chat-bubble .md-table td {
+    border: 1px solid #e0e0e0;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.chat-bubble .md-table th {
+    background-color: #f5f3f0;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.chat-bubble .md-table tr:nth-child(even) {
+    background-color: #fafafa;
+}
+
+.chat-bubble .md-table tr:hover {
+    background-color: #f5f3f0;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .layout {
