@@ -13,7 +13,7 @@ openpyxl = ">=3.1.5,<4.0.0"
 pandas = ">=2.3.3,<3.0.0"
 pyyaml = ">=6.0.3,<7.0.0"
 graphrag = { git = "git@github.com:PaoloL997/graphrag.git", rev = "main" }
-duckling = { git = "git@github.com:PaoloL997/duckling.git", rev = "main" }
+duckling = { git = "git@github.com:PaoloL997/duckling.git", rev = "feat/jobpeek" }
 
 [[tool.poetry.source]]
 name = "pytorch"

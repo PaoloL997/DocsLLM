@@ -43,6 +43,26 @@ function setupEventListeners() {
         sidebarToggle.addEventListener('click', function() {
             const isClosed = sidebar.classList.toggle('closed');
             sidebarToggle.setAttribute('aria-label', isClosed ? 'Apri sidebar' : 'Chiudi sidebar');
+            
+            // Animate chat card position during sidebar transition
+            const chatCard = document.querySelector('.chat-card.fixed');
+            if (chatCard && window.alignChatCardGlobal) {
+                const startTime = performance.now();
+                const duration = 200; // Match sidebar transition duration (0.2s = 200ms)
+                
+                function animatePosition(currentTime) {
+                    const elapsed = currentTime - startTime;
+                    
+                    // Keep updating position during transition
+                    window.alignChatCardGlobal();
+                    
+                    if (elapsed < duration) {
+                        requestAnimationFrame(animatePosition);
+                    }
+                }
+                
+                requestAnimationFrame(animatePosition);
+            }
         });
     }
 
@@ -300,9 +320,31 @@ async function loadCollections(commessaCode, container) {
     try {
         if (container) {
             container.querySelectorAll('.collections-section, .collections-container').forEach((el) => el.remove());
+            
+            // Show loading spinner while fetching collections
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'collections-loading';
+            loadingDiv.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:12px;';
+            loadingDiv.innerHTML = `
+                <div style="width:32px;height:32px;border:3px solid rgba(212, 112, 77, 0.2);border-top:3px solid var(--accent-color);border-radius:50%;animation:spin 1s linear infinite;"></div>
+                <div style="font-size:13px;color:var(--text-light);text-align:center;">Caricamento notebook...</div>
+                <style>
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+                </style>
+            `;
+            container.appendChild(loadingDiv);
         }
+        
         const response = await fetch(`/api/list-collections/?commessa=${encodeURIComponent(commessaCode)}`);
         const data = await response.json();
+        
+        // Remove loading spinner
+        if (container) {
+            const loader = container.querySelector('.collections-loading');
+            if (loader) loader.remove();
+        }
         
         if (data.collections) {
             renderCollections(data.collections, container, commessaCode);
@@ -317,6 +359,13 @@ async function loadCollections(commessaCode, container) {
         }
     } catch (error) {
         console.error('Error loading collections:', error);
+        
+        // Remove loading spinner on error
+        if (container) {
+            const loader = container.querySelector('.collections-loading');
+            if (loader) loader.remove();
+        }
+        
         // Show error message to user
         const errorDiv = document.createElement('div');
         errorDiv.style.padding = '12px';
@@ -1008,6 +1057,9 @@ function ensureChatVisible() {
                 chatCard.style.transform = 'translateX(-50%)';
             }
         }
+
+        // Store globally so sidebar toggle can call it
+        window.alignChatCardGlobal = alignChatCard;
 
         // align now and on resize (keeps centered if window/container changes)
         alignChatCard();
