@@ -55,19 +55,73 @@ def send_message(request):
             print(f"Commessa: {active_agent['commessa']}, Collection: {active_agent['collection']}, Mode: {active_agent.get('mode', 'Unknown')}, Model: {active_agent.get('model', 'Unknown')}, Thinking Level: {active_agent.get('draw_thinking_level', 'Unknown')}")
             print(f"{'='*80}")
             
-            response = agent.invoke(message)
-            
-            print(f"\nAGENT RESPONSE:")
+            final_state = agent.invoke(message)
+            context = final_state.get("context", [])
+            print(f"\nCONTEXT: {context}")
+            response = final_state.get("response", "")
             print(response)
             print(f"{'='*80}\n")
             
             # Extract only the text response from the agent result
             response_text = response.get('response', '') if isinstance(response, dict) else str(response)
-            
+
+            # Indicate to the frontend whether the agent returned any context
+            has_context = bool(context) and isinstance(context, (list, tuple)) and len(context) > 0
+
+            # Build a list of button descriptors from LangChain Document objects in context
+            context_buttons = []
+            try:
+                if has_context:
+                    for idx, doc in enumerate(context):
+                        meta = {}
+                        # support dict-like documents or objects with .metadata
+                        if isinstance(doc, dict):
+                            meta = doc.get('metadata', {}) if isinstance(doc.get('metadata', {}), dict) else {}
+                        else:
+                            # try attribute access
+                            meta = getattr(doc, 'metadata', {}) or {}
+
+                        # normalize fields
+                        doc_type = meta.get('type') or meta.get('doc_type') or (meta.get('mimetype') or '').split('/')[0] or 'text'
+                        name = meta.get('name') or meta.get('source') or meta.get('filename') or 'unknown'
+                        page_start = meta.get('page_start')
+                        page_end = meta.get('page_end')
+
+                        # Compose label according to rules
+                        label = None
+                        lower_name = str(name).lower() if name is not None else ''
+                        if str(doc_type).lower() == 'text':
+                            if lower_name == 'collection_summary':
+                                label = 'Summary generata automaticamente'
+                            else:
+                                if page_start is not None and page_end is not None:
+                                    label = f"Pagine {page_start} - {page_end} di {name}"
+                                else:
+                                    label = f"{name}"
+                        elif str(doc_type).lower() in ['image', 'draw']:
+                            label = f"{name}"
+                        else:
+                            # fallback: show name
+                            label = f"{name}"
+
+                        context_buttons.append({
+                            'label': label,
+                            'name': name,
+                            'type': doc_type,
+                            'page_start': page_start,
+                            'page_end': page_end,
+                            'index': idx
+                        })
+            except Exception as e:
+                print(f"Error building context buttons: {e}")
+                context_buttons = []
+
             return JsonResponse({
                 'success': True,
                 'message': 'Message processed by agent',
-                'response': response_text
+                'response': response_text,
+                'has_context': has_context,
+                'context_buttons': context_buttons
             })
             
         except Exception as e:

@@ -571,6 +571,39 @@ html, body {
     transform: translateY(0);
 }
 
+/* Small rounded 'fonti' button shown under assistant responses when sources are available */
+.assistant-controls {
+    display: flex;
+    align-items: center;
+}
+
+.assistant-sources-label {
+    font-size: 13px;
+    color: var(--text-light);
+    font-weight: 400;
+    margin-right: 6px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.sources-btn {
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: none;
+    background-color: var(--accent-color);
+    color: var(--secondary-color);
+    font-size: 13px;
+    font-weight: 400;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(212, 112, 77, 0.18);
+    transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.sources-btn:hover {
+    transform: translateY(-2px);
+    opacity: 0.98;
+}
+
 /* Collection Files List */
 .collection-files-empty {
     text-align: center;

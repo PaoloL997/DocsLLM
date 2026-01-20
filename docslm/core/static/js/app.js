@@ -1501,13 +1501,53 @@ async function sendMessage() {
             body: JSON.stringify({ message: message, mode: mode })
         });
         const data = await response.json();
-        if (data.success) {
+            if (data.success) {
             // input already cleared earlier
             if (loaderRow) {
                 if (loaderRow._timer) clearInterval(loaderRow._timer);
                 loaderRow.remove();
             }
-            appendMessage('assistant', data.response || '');
+            // Append assistant response and capture the row element
+            const assistantRow = appendMessage('assistant', data.response || '');
+
+            // If backend returned context_buttons, render them inside the assistant bubble
+            if (Array.isArray(data.context_buttons) && assistantRow) {
+                try {
+                    const bubbleEl = assistantRow.querySelector('.chat-bubble');
+                    if (bubbleEl) {
+                        const controls = document.createElement('div');
+                            controls.className = 'assistant-controls';
+                            controls.style.cssText = 'margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;';
+
+                            // Label placed before the buttons
+                            const labelEl = document.createElement('div');
+                            labelEl.className = 'assistant-sources-label';
+                            labelEl.textContent = 'Fonti:';
+                            controls.appendChild(labelEl);
+
+                            data.context_buttons.forEach((btnDef) => {
+                                const btn = document.createElement('button');
+                                btn.className = 'sources-btn';
+                                btn.type = 'button';
+                                btn.textContent = btnDef.label || btnDef.name || 'Fonte';
+                                btn.title = (btnDef.name ? btnDef.name + ' - ' : '') + (btnDef.type || '');
+                                btn.dataset.index = btnDef.index;
+                                btn.addEventListener('click', (e) => {
+                                    e.stopPropagation();
+                                    // placeholder action: for now just log the metadata
+                                    console.log('Context button clicked:', btnDef);
+                                });
+                                controls.appendChild(btn);
+                            });
+
+                            // Append controls inside the bubble so they sit at bottom-left
+                            bubbleEl.appendChild(controls);
+                    }
+                } catch (err) {
+                    console.error('Error rendering context buttons:', err);
+                }
+            }
+
             // after assistant response, ensure the user's question is the first visible
             if (userRow) {
                 setTimeout(() => {
