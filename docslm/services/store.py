@@ -82,7 +82,6 @@ class ManageDB:
             # Save selected files as collection properties
             if files:
                 collection_obj.set_properties({"files": json.dumps(files)})
-            
             collection_obj.release()
             
             # Process and add documents if files are provided

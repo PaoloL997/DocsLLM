@@ -1,11 +1,29 @@
 // Get greeting on page load
 document.addEventListener('DOMContentLoaded', function() {
-    loadGreeting();
-    setupEventListeners();
-    // disable send until an agent/collection is selected
-    disableSendButton();
-    initializeDropdown();
-    restoreSelectedCommessa();
+    console.log('[DEBUG] DOMContentLoaded fired');
+    try {
+        loadGreeting();
+        setupEventListeners();
+        // disable send until an agent/collection is selected
+        disableSendButton();
+        initializeDropdown();
+        restoreSelectedCommessa();
+        
+        // Check for any blocking overlays
+        setTimeout(() => {
+            const modals = document.querySelectorAll('.create-collection-modal, .modal');
+            modals.forEach(modal => {
+                if (window.getComputedStyle(modal).display !== 'none' && !modal.classList.contains('open')) {
+                    console.log('[DEBUG] Hiding unexpected modal:', modal.id);
+                    modal.style.display = 'none';
+                }
+            });
+            document.body.style.pointerEvents = 'auto';
+            console.log('[DEBUG] UI initialization complete');
+        }, 50);
+    } catch (error) {
+        console.error('[DEBUG] Error during initialization:', error);
+    }
 });
 
 function initializeDropdown() {
@@ -36,8 +54,24 @@ function setupEventListeners() {
     const usernameInput = document.getElementById('usernameInput');
     const jobModal = document.getElementById('jobModal');
     const closeModal = document.getElementById('closeModal');
+    const collectionModal = document.getElementById('collectionModal');
+    const closeCollectionModal = document.getElementById('closeCollectionModal');
     const createCollectionModal = document.getElementById('createCollectionModal');
     const createCollectionConfirmBtn = document.getElementById('createCollectionConfirmBtn');
+
+    console.log('[DEBUG] Elements found:', {
+        messageInput: !!messageInput,
+        sendBtn: !!sendBtn,
+        modelSelect: !!modelSelect,
+        modelMenu: !!modelMenu,
+        sidebar: !!sidebar,
+        loginBtn: !!loginBtn
+    });
+    
+    // Add global click handler for debugging
+    document.addEventListener('click', function(e) {
+        console.log('[DEBUG] Click detected on:', e.target.tagName, e.target.id || e.target.className);
+    }, true);
 
     if (sidebar && sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
@@ -159,10 +193,21 @@ function setupEventListeners() {
         });
     }
 
+    if (closeCollectionModal && collectionModal) {
+        closeCollectionModal.addEventListener('click', () => {
+            collectionModal.classList.remove('open');
+        });
+    }
+
     window.addEventListener('click', (e) => {
         if (e.target === jobModal) {
             if (jobModal.classList.contains('open')) {
                 jobModal.classList.remove('open');
+            }
+        }
+        if (collectionModal && e.target === collectionModal) {
+            if (collectionModal.classList.contains('open')) {
+                collectionModal.classList.remove('open');
             }
         }
     });
@@ -403,13 +448,15 @@ function renderCollections(collections, container, commessaCode) {
         card.className = 'collection-card';
         card.innerHTML = `
             <span class="collection-name">${collection.displayName}</span>
-            <svg class="collection-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14,2 14,8 20,8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10,9 9,9 8,9"></polyline>
-            </svg>
+            <div class="collection-actions">
+                <svg class="collection-icon clickable" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" title="Informazioni" aria-label="Informazioni collection">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14,2 14,8 20,8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10,9 9,9 8,9"></polyline>
+                </svg>
+            </div>
         `;
 
         card.addEventListener('click', async () => {
@@ -435,6 +482,15 @@ function renderCollections(collections, container, commessaCode) {
         });
 
         list.appendChild(card);
+
+        // Info icon opens collection modal (do not propagate to card click)
+        const infoIcon = card.querySelector('.collection-icon.clickable');
+        if (infoIcon) {
+            infoIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showCollectionDetails(collection, commessaCode);
+            });
+        }
     });
 
     section.appendChild(createWrapper);
@@ -824,6 +880,45 @@ function showJobDetails(job) {
         </div>
     `).join('');
     modal.classList.add('open');
+}
+
+async function showCollectionDetails(collection, commessa) {
+    const modal = document.getElementById('collectionModal');
+    const title = document.getElementById('modalCollectionTitle');
+    const details = document.getElementById('modalCollectionDetails');
+    if (!modal || !title || !details) return;
+    title.textContent = `Notebook: ${collection.displayName}`;
+    
+    // Mostra caricamento (span across both columns)
+    details.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-light);">Caricamento file...</div>';
+    modal.classList.add('open');
+    
+    try {
+        const response = await fetch(`/api/list-collection-files/?commessa=${encodeURIComponent(commessa)}&collection=${encodeURIComponent(collection.name)}`);
+        const data = await response.json();
+        
+        if (data.files && data.files.length > 0) {
+            const filesList = data.files.map(file => `
+                <div class="jobfile-row jobfile-file" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border-color);border-radius:6px;background:var(--secondary-color);transition:all 0.2s;">
+                    <div style="display:flex;align-items:center;gap:10px;flex:1;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14,2 14,8 20,8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                        <span style="font-size:14px;color:var(--text-color);word-break:break-all;">${file}</span>
+                    </div>
+                </div>
+            `).join('');
+            details.innerHTML = `<div style="grid-column: 1 / -1; display:flex;flex-direction:column;gap:4px;">${filesList}</div>`;
+        } else {
+            details.innerHTML = '<div class="collection-files-empty" style="grid-column: 1 / -1;">Nessun file trovato per questo notebook.</div>';
+        }
+    } catch (error) {
+        console.error('Error loading collection files:', error);
+        details.innerHTML = '<div class="collection-files-error" style="grid-column: 1 / -1;">Errore nel caricamento dei file.</div>';
+    }
 }
 
 function autoResizeTextarea(textarea) {

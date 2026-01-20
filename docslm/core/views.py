@@ -468,3 +468,63 @@ def list_job_files(request):
         print(f"Error listing job files: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
+
+def list_collection_files(request):
+    """List files associated with a collection."""
+    commessa = request.GET.get('commessa', '').strip()
+    collection_name = request.GET.get('collection', '').strip()
+    
+    if not commessa or not collection_name:
+        return JsonResponse({'error': 'Commessa and collection name are required'}, status=400)
+    
+    try:
+        import sys
+        sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
+        from services.store import ManageDB
+        
+        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+        
+        if not os.path.exists(config_path):
+            return JsonResponse({'error': 'Configuration file not found'}, status=500)
+        
+        # Get collection properties
+        from pymilvus import Collection, connections
+        
+        uri = None
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        uri = config.get('uri')
+        
+        if not uri:
+            return JsonResponse({'error': 'URI not configured'}, status=500)
+        
+        # Connect to Milvus
+        host = uri.split("://")[1].split(":")[0]
+        port = int(uri.split(":")[-1])
+        connections.connect(host=host, port=port)
+        
+        db_name = f"comm_{commessa}"
+        from pymilvus import db
+        db.using_database(db_name)
+        
+        collection_obj = Collection(collection_name)
+        collection_info = collection_obj.describe()
+        custom_properties = collection_info.get("properties", {})
+        
+        files_data = []
+        if "files" in custom_properties:
+            import json
+            files_data = json.loads(custom_properties["files"])
+        
+        return JsonResponse({
+            'files': files_data,
+            'commessa': commessa,
+            'collection': collection_name
+        })
+        
+    except Exception as e:
+        print(f"Error listing collection files: {e}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=500)
+
