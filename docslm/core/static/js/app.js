@@ -1005,7 +1005,16 @@ function renderJobFileBrowser(data) {
 function openModelDropdown() {
     const modelMenu = document.getElementById('modelMenu');
     const modelSelect = document.getElementById('modelSelect');
+    const chatCard = document.querySelector('.chat-card');
+    
     if (modelMenu && modelSelect) {
+        // Se la chat card è fissa in basso, apri il menu verso l'alto
+        if (chatCard && chatCard.classList.contains('fixed')) {
+            modelMenu.classList.add('open-upward');
+        } else {
+            modelMenu.classList.remove('open-upward');
+        }
+        
         modelMenu.classList.add('open');
         modelSelect.classList.add('active');
     }
