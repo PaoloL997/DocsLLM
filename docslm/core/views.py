@@ -52,7 +52,7 @@ def send_message(request):
             # Invoke agent with user message
             print(f"\n{'='*80}")
             print(f"USER QUERY: {message}")
-            print(f"Commessa: {active_agent['commessa']}, Collection: {active_agent['collection']}, Model: {active_agent['model']}")
+            print(f"Commessa: {active_agent['commessa']}, Collection: {active_agent['collection']}, Mode: {active_agent.get('mode', 'Unknown')}, Model: {active_agent.get('model', 'Unknown')}, Thinking Level: {active_agent.get('draw_thinking_level', 'Unknown')}")
             print(f"{'='*80}")
             
             response = agent.invoke(message)
@@ -330,7 +330,7 @@ def initialize_agent(request):
         data = json.loads(request.body)
         commessa = data.get('commessa', '').strip()
         collection_name = data.get('collection_name', '').strip()
-        model = data.get('model', 'gpt-4.1-nano').strip()
+        mode = data.get('mode', 'veloce').strip().lower()
         
         if not commessa or not collection_name:
             return JsonResponse({'error': 'Commessa and collection name are required'}, status=400)
@@ -359,7 +359,7 @@ def initialize_agent(request):
         )
         
         # Create agent and store it in global dictionary
-        agent = Agent(store=store, model=model, rerank=True)
+        agent = Agent(store=store, mode=mode, rerank=True)
         
         # Store agent instance in memory indexed by session key
         session_key = request.session.session_key
@@ -373,19 +373,24 @@ def initialize_agent(request):
         request.session['active_agent'] = {
             'commessa': commessa,
             'collection': collection_name,
-            'model': model
+            'mode': mode,
+            'model': agent.model,  # Il modello effettivamente utilizzato
+            'draw_thinking_level': agent.draw_thinking_level
         }
         request.session.modified = True
         
         print(f"Agent created and stored for session {session_key}")
-        print(f"Commessa: {commessa}, Collection: {collection_name}, Model: {model}")
+        print(f"Commessa: {commessa}, Collection: {collection_name}, Mode: {mode}")
+        print(f"Actual Model: {agent.model}, Thinking Level: {agent.draw_thinking_level}")
         
         return JsonResponse({
             'success': True,
             'message': 'Agent initialized successfully',
             'commessa': commessa,
             'collection': collection_name,
-            'model': model
+            'mode': mode,
+            'model': agent.model,
+            'draw_thinking_level': agent.draw_thinking_level
         })
         
     except Exception as e:

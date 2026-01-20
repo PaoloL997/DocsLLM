@@ -9,9 +9,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeDropdown() {
-    const firstOption = document.querySelector('.model-option[data-value]');
-    if (firstOption) {
-        firstOption.classList.add('selected');
+    const veloceOption = document.querySelector('.model-option[data-value="veloce"]');
+    if (veloceOption) {
+        veloceOption.classList.add('selected');
     }
 }
 
@@ -524,11 +524,11 @@ async function initializeAgent(commessa, collectionName) {
         // Show loading state
         showAgentLoading();
         
-        // Get selected model from UI
+        // Get selected mode from UI
         const modelSelected = document.querySelector('.model-selected');
-        const model = modelSelected ? modelSelected.textContent.trim() : 'gpt-4.1-nano';
+        const mode = modelSelected ? modelSelected.textContent.trim().toLowerCase() : 'veloce';
         
-        console.log('Initializing agent with:', { commessa, collectionName, model });
+        console.log('Initializing agent with:', { commessa, collectionName, mode });
         
         const response = await fetch('/api/initialize-agent/', {
             method: 'POST',
@@ -539,7 +539,7 @@ async function initializeAgent(commessa, collectionName) {
             body: JSON.stringify({
                 commessa: commessa,
                 collection_name: collectionName,
-                model: model
+                mode: mode
             })
         });
         
@@ -549,7 +549,7 @@ async function initializeAgent(commessa, collectionName) {
             activeCollection = {
                 commessa: commessa,
                 collection: collectionName,
-                model: model
+                mode: mode
             };
             console.log('Agent initialized successfully:', data);
             // Show success message
@@ -1036,9 +1036,9 @@ function selectModel(value, title) {
         opt.classList.toggle('selected', opt.dataset.value === value);
     });
     
-    // If there's an active agent, reinitialize it with the new model
+    // If there's an active agent, reinitialize it with the new mode
     if (activeCollection) {
-        console.log('Reinitializing agent with new model:', value);
+        console.log('Reinitializing agent with new mode:', value);
         initializeAgent(activeCollection.commessa, activeCollection.collection);
     }
 }
@@ -1382,7 +1382,7 @@ async function sendMessage() {
     const messageInput = document.getElementById('messageInput');
     const modelSelected = document.querySelector('.model-selected');
     const message = messageInput ? messageInput.value.trim() : '';
-    const model = modelSelected ? modelSelected.textContent : '';
+    const mode = modelSelected ? modelSelected.textContent.toLowerCase() : 'veloce';
 
     if (!message) return;
 
@@ -1403,7 +1403,7 @@ async function sendMessage() {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({ message: message, model: model })
+            body: JSON.stringify({ message: message, mode: mode })
         });
         const data = await response.json();
         if (data.success) {
