@@ -54,5 +54,5 @@ class Agent:
             draw_model=draw_model,
         )
     
-    def invoke(self, query: str):
-        return self.agent.run(query)
+    def invoke(self, query: str, user_id: str | None = None) -> str:
+        return self.agent.run(query, user_id)

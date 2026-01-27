@@ -1,7 +1,6 @@
 import os
 import csv
 import yaml
-import pandas as pd
 import math
 from datetime import datetime
 from django.conf import settings
@@ -9,6 +8,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 
 # Global dictionary to store agent instances by session key
+# TODO: Use REDIS
 AGENT_INSTANCES = {}
 
 
@@ -30,6 +30,7 @@ def send_message(request):
         import json
         data = json.loads(request.body)
         message = data.get('message', '')
+        username = request.session.get('username', None)
         
         # Check if there's an active agent in session
         active_agent = request.session.get('active_agent')
@@ -55,7 +56,7 @@ def send_message(request):
             print(f"Commessa: {active_agent['commessa']}, Collection: {active_agent['collection']}, Mode: {active_agent.get('mode', 'Unknown')}, Model: {active_agent.get('model', 'Unknown')}, Thinking Level: {active_agent.get('draw_thinking_level', 'Unknown')}")
             print(f"{'='*80}")
             
-            final_state = agent.invoke(message)
+            final_state = agent.invoke(message, user_id=username)
             context = final_state.get("context", [])
             print(f"\nCONTEXT: {context}")
             response = final_state.get("response", "")
@@ -87,30 +88,25 @@ def send_message(request):
                         page_start = meta.get('page_start')
                         page_end = meta.get('page_end')
 
-                        # Compose label according to rules
-                        label = None
-                        lower_name = str(name).lower() if name is not None else ''
-                        if str(doc_type).lower() == 'text':
-                            if lower_name == 'collection_summary':
-                                label = 'Summary generata automaticamente'
-                            else:
-                                if page_start is not None and page_end is not None:
-                                    label = f"Pagine {page_start} - {page_end} di {name}"
-                                else:
-                                    label = f"{name}"
-                        elif str(doc_type).lower() in ['image', 'draw']:
-                            label = f"{name}"
-                        else:
-                            # fallback: show name
-                            label = f"{name}"
+                        # Compose label as sequential letters: A, B, C, ..., Z, AA, AB, ...
+                        def idx_to_letters(i: int) -> str:
+                            result = ''
+                            n = i + 1
+                            while n > 0:
+                                n, rem = divmod(n - 1, 26)
+                                result = chr(65 + rem) + result
+                            return result
+
+                        label = idx_to_letters(idx)
 
                         context_buttons.append({
                             'label': label,
                             'name': name,
-                            'type': doc_type,
+                            'ty e': doc_type,
                             'page_start': page_start,
                             'page_end': page_end,
-                            'index': idx
+                            'index': idx,
+                            'metadata': meta
                         })
             except Exception as e:
                 print(f"Error building context buttons: {e}")
@@ -149,6 +145,7 @@ def user_login(request):
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row['username'].lower() == username:
+                        request.session['username'] = username
                         return JsonResponse({
                             'success': True,
                             'name': row['display_name'],
@@ -265,6 +262,168 @@ def search_commesse(request):
         }]
 
     return JsonResponse({'results': mock_results})
+
+def check_path(request):
+    """API semplice per verificare se un percorso esiste sul filesystem del server.
+    POST JSON: { "path": "C:/..." }
+    Risposta: { "exists": true|false, "path": "..." }
+    """
+    if request.method == 'POST':
+        import json
+        import mimetypes
+        import io
+        # try to import PyPDF2 (or pypdf) for PDF page extraction
+        PdfReader = None
+        PdfWriter = None
+        try:
+            from PyPDF2 import PdfReader, PdfWriter
+        except Exception:
+            try:
+                from pypdf import PdfReader, PdfWriter
+            except Exception:
+                PdfReader = None
+                PdfWriter = None
+        import base64
+
+        MAX_PREVIEW_BYTES = 10 * 1024 * 1024  # 10 MB limit for preview
+
+        try:
+            data = json.loads(request.body)
+            path = (data.get('path') or '').strip()
+            if not path:
+                return JsonResponse({'error': 'Path mancante'}, status=400)
+
+            exists = os.path.exists(path)
+            resp = {'exists': exists, 'path': path}
+
+            if not exists:
+                return JsonResponse(resp)
+
+            # If it's a directory, return a simple listing
+            if os.path.isdir(path):
+                try:
+                    items = []
+                    for name in os.listdir(path):
+                        full = os.path.join(path, name)
+                        items.append({'name': name, 'is_dir': os.path.isdir(full)})
+                    resp.update({'is_dir': True, 'listing': items})
+                    return JsonResponse(resp)
+                except Exception as e:
+                    resp.update({'error': str(e)})
+                    return JsonResponse(resp, status=500)
+
+            # It's a file: attempt to provide a preview
+            resp['is_file'] = True
+            try:
+                size = os.path.getsize(path)
+                resp['size'] = size
+            except Exception:
+                resp['size'] = None
+
+            mimetypes.init()
+            mime, _ = mimetypes.guess_type(path)
+            resp['mimetype'] = mime
+
+            # Images: return base64 data URI (if reasonably sized)
+            if mime and mime.startswith('image/'):
+                if resp.get('size') and resp['size'] > MAX_PREVIEW_BYTES:
+                    resp['error'] = 'File troppo grande per anteprima'
+                    return JsonResponse(resp)
+                try:
+                    with open(path, 'rb') as fh:
+                        b = fh.read()
+                    data_uri = f"data:{mime};base64," + base64.b64encode(b).decode('ascii')
+                    resp['data_uri'] = data_uri
+                    return JsonResponse(resp)
+                except Exception as e:
+                    resp.update({'error': str(e)})
+                    return JsonResponse(resp, status=500)
+
+            # PDF: return base64 data URI so browser can render visually
+            if (mime and mime == 'application/pdf') or path.lower().endswith('.pdf'):
+                if resp.get('size') and resp['size'] > MAX_PREVIEW_BYTES:
+                    resp['error'] = 'File troppo grande per anteprima'
+                    return JsonResponse(resp)
+                # check if caller requested a specific page range
+                page_start = data.get('page_start')
+                page_end = data.get('page_end')
+
+                # If page range provided and PDF library available, extract pages
+                if page_start is not None and page_end is not None and PdfReader and PdfWriter:
+                    try:
+                        # normalize to integers
+                        ps = int(page_start)
+                        pe = int(page_end)
+                        if ps < 1:
+                            ps = 1
+                        if pe < ps:
+                            pe = ps
+
+                        reader = PdfReader(path)
+                        num_pages = len(reader.pages)
+                        # clamp
+                        ps = min(ps, num_pages)
+                        pe = min(pe, num_pages)
+
+                        writer = PdfWriter()
+                        for p in range(ps - 1, pe):
+                            try:
+                                writer.add_page(reader.pages[p])
+                            except Exception:
+                                pass
+
+                        out = io.BytesIO()
+                        writer.write(out)
+                        out_bytes = out.getvalue()
+                        if len(out_bytes) > MAX_PREVIEW_BYTES:
+                            resp['error'] = 'Anteprima estratta troppo grande'
+                            return JsonResponse(resp)
+                        pdf_uri = "data:application/pdf;base64," + base64.b64encode(out_bytes).decode('ascii')
+                        resp['pdf_data_uri'] = pdf_uri
+                        resp['extracted_pages'] = {'page_start': ps, 'page_end': pe}
+                        return JsonResponse(resp)
+                    except Exception as e:
+                        # fallback to full PDF if extraction fails
+                        resp.update({'error': 'Impossibile estrarre pagine: ' + str(e)})
+                        return JsonResponse(resp, status=500)
+
+                # default: return full PDF as before
+                try:
+                    with open(path, 'rb') as fh:
+                        b = fh.read()
+                    pdf_uri = "data:application/pdf;base64," + base64.b64encode(b).decode('ascii')
+                    resp['pdf_data_uri'] = pdf_uri
+                    return JsonResponse(resp)
+                except Exception as e:
+                    resp.update({'error': str(e)})
+                    return JsonResponse(resp, status=500)
+
+            # For other files try to read as text (utf-8 then latin-1)
+            if resp.get('size') and resp['size'] > MAX_PREVIEW_BYTES:
+                resp['error'] = 'File troppo grande per anteprima'
+                return JsonResponse(resp)
+
+            try:
+                with open(path, 'r', encoding='utf-8') as fh:
+                    content = fh.read()
+            except UnicodeDecodeError:
+                try:
+                    with open(path, 'r', encoding='latin-1') as fh:
+                        content = fh.read()
+                except Exception as e:
+                    resp.update({'error': f'Impossibile decodificare il file: {e}'})
+                    return JsonResponse(resp, status=500)
+            except Exception as e:
+                resp.update({'error': str(e)})
+                return JsonResponse(resp, status=500)
+
+            resp['preview'] = content
+            return JsonResponse(resp)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Metodo non consentito'}, status=405)
 
 
 def list_collections(request):

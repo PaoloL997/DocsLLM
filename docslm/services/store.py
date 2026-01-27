@@ -68,6 +68,8 @@ class ManageDB:
                 "name": "__init__",
                 "path": "N/A",
                 "type": "placeholder",
+                "page_start": "N/A",
+                "page_end": "N/A",
             },
         )
 
