@@ -1,7 +1,7 @@
 import json
 import yaml
 
-from graphrag.store import (
+from graphrag.store.store import (
     Store,
     list_collections,
     list_databases,

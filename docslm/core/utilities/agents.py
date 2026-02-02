@@ -101,7 +101,7 @@ def initialize_agent(request):
         import sys
         sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
         from services.agent import Agent
-        from graphrag.store import Store
+        from graphrag.store.store import Store
         import yaml
 
         config_path = os.path.join(settings.BASE_DIR, 'config.yaml')

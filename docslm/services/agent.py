@@ -1,5 +1,5 @@
-from graphrag.agent import GraphRAG
-from graphrag.store import Store
+from graphrag.graph.agent import GraphRAG
+from graphrag.store.store import Store
 
 
 class Agent:
