@@ -100,6 +100,12 @@
                     </div>
 
                     <div class="chat-controls-right">
+                        <button class="settings-button" id="settingsButton" aria-label="Impostazioni" title="Impostazioni">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
                         <div class="model-control">
                             <button class="model-dropdown" id="modelSelect" aria-label="Seleziona modalità">
                                 <span class="model-selected">Veloce</span>
@@ -181,6 +187,18 @@
             </div>
             <div class="create-collection-actions">
                 <button id="createCollectionConfirmBtn" class="create-collection-confirm">Crea</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="settings-modal">
+        <div class="settings-dropdown-menu" id="settingsMenu">
+            <div class="settings-param">
+                <div class="settings-param-left">
+                    <label for="kInput">K</label>
+                    <p class="settings-param-description">Numero di documenti recuperati dal vector store tramite retrieval semantico</p>
+                </div>
+                <input type="number" id="kInput" class="settings-input" value="4" min="1">
             </div>
         </div>
     </div>

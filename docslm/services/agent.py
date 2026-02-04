@@ -3,7 +3,6 @@ from graphrag.store.store import Store
 
 
 class Agent:
-    # Configurazioni predefinite per le modalità
     MODES = {
         'veloce': {
             'model': 'gpt-4.1-nano',

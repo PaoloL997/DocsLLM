@@ -1498,6 +1498,191 @@ html, body {
     transition: opacity 0.2s ease;
 }
 
+/* Settings Button */
+.settings-button {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border: none;
+    background-color: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.2s ease;
+}
+
+.settings-button:hover {
+    color: var(--text-color);
+}
+
+.settings-button:focus {
+    outline: none;
+    color: var(--text-color);
+}
+
+.settings-button.active {
+    color: var(--text-color);
+}
+
+/* Settings Modal */
+.settings-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: transparent;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+}
+
+.settings-modal.open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.settings-dropdown-menu {
+    position: absolute;
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    padding: 16px;
+    width: 320px;
+    max-width: 320px;
+    z-index: 2001;
+    transform: translateY(-8px);
+    transition: all 0.2s ease;
+}
+
+.settings-modal.open .settings-dropdown-menu {
+    transform: translateY(0);
+}
+
+.settings-menu-header {
+    display: none;
+}
+
+.settings-menu-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.settings-close {
+    display: none;
+}
+
+.settings-close:hover {
+    color: var(--text-color);
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.settings-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    margin-bottom: 4px;
+}
+
+.settings-option:last-child {
+    margin-bottom: 0;
+}
+
+.settings-option:hover {
+    background-color: #f8f9fa;
+}
+
+.settings-option.selected {
+    background-color: #f0f9ff;
+}
+
+.settings-option-content {
+    flex: 1;
+}
+
+.settings-option-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 2px;
+}
+
+.settings-option-desc {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.settings-check {
+    color: var(--accent-color);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.settings-option.selected .settings-check {
+    opacity: 1;
+}
+
+.settings-param {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 12px 8px;
+    justify-content: space-between;
+}
+
+.settings-param-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-param label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.settings-param-description {
+    font-size: 12px;
+    color: var(--text-light);
+    margin: 0;
+    line-height: 1.4;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+.settings-input {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text-color);
+    background-color: var(--secondary-color);
+    font-family: 'Fira Mono', monospace;
+    width: 60px;
+}
+
+.settings-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(212, 112, 77, 0.1);
+}
+
 .model-option.selected .model-check {
     opacity: 1;
 }

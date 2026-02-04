@@ -14,5 +14,6 @@ urlpatterns = [
     path('api/list-collection-files/', views.list_collection_files, name='list_collection_files'),
     path('api/create-collection/', views.create_collection, name='create_collection'),
     path('api/initialize-agent/', views.initialize_agent, name='initialize_agent'),
+    path('api/update-k/', views.update_k, name='update_k'),
     path('api/check-path/', views.check_path, name='check_path'),
 ]

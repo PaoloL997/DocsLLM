@@ -1,5 +1,6 @@
 import os
 import json
+import yaml
 from django.conf import settings
 from django.http import JsonResponse
 
@@ -14,6 +15,44 @@ def _idx_to_letters(i: int) -> str:
         n, rem = divmod(n - 1, 26)
         result = chr(65 + rem) + result
     return result
+
+
+def update_k(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        new_k = data.get('k', 4)
+        
+        if not isinstance(new_k, int) or new_k < 1:
+            return JsonResponse({'error': 'K deve essere un numero intero maggiore di 0'}, status=400)
+
+        # Aggiorna il file di configurazione
+        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+        if not os.path.exists(config_path):
+            return JsonResponse({'error': 'File di configurazione non trovato'}, status=500)
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        
+        old_k = config.get('k', 4)
+        config['k'] = new_k
+        
+        with open(config_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(config, f, default_flow_style=False, allow_unicode=True)
+        
+        print(f"[K UPDATE] K value changed from {old_k} to {new_k}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'K aggiornato a {new_k}',
+            'k': new_k
+        })
+
+    except Exception as e:
+        print(f"[K UPDATE ERROR] Errore durante l'aggiornamento di K: {str(e)}")
+        return JsonResponse({'error': f'Errore durante l\'aggiornamento di K: {str(e)}'}, status=500)
 
 
 def send_message(request):
@@ -112,11 +151,15 @@ def initialize_agent(request):
             config = yaml.safe_load(f)
 
         db_name = f"comm_{commessa}"
+        k_value = config.get('k', 4)
+        
+        print(f"[AGENT INIT] Initializing agent with K={k_value}, commessa={commessa}, collection={collection_name}, mode={mode}")
+        
         store = Store(
             uri=config.get('uri'),
             database=db_name,
             collection=collection_name,
-            k=config.get('k', 4),
+            k=k_value,
             embedding_model=config.get('embedding_model')
         )
 
