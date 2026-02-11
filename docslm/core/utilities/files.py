@@ -31,6 +31,7 @@ def check_path(request):
     try:
         data = json.loads(request.body)
         path = (data.get('path') or '').strip()
+        file_type = (data.get('type') or '').strip().lower()  # Add type from request
         if not path:
             return JsonResponse({'error': 'Path mancante'}, status=400)
 
@@ -81,6 +82,12 @@ def check_path(request):
         if (mime and mime == 'application/pdf') or path.lower().endswith('.pdf'):
             page_start = data.get('page_start')
             page_end = data.get('page_end')
+            
+            # For 'draw' type files, always show only the first page
+            if file_type == 'draw':
+                page_start = 1
+                page_end = 1
+            
             # try extract pages if requested and library available
             if page_start is not None and page_end is not None and PdfReader and PdfWriter:
                 try:

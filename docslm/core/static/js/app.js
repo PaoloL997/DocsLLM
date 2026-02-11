@@ -1687,7 +1687,12 @@ function openSourceModal(btnDef) {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({ path: pathVal, page_start: ps !== undefined ? ps : null, page_end: pe !== undefined ? pe : null })
+            body: JSON.stringify({ 
+                path: pathVal, 
+                type: rawType,  // Add the type to the request
+                page_start: ps !== undefined ? ps : null, 
+                page_end: pe !== undefined ? pe : null 
+            })
         }).then(r => r.json()).then(res => {
             loading.remove();
             if (res && (res.preview !== undefined || res.pdf_data_uri || res.data_uri || res.listing)) {
