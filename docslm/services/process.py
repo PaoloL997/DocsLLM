@@ -10,9 +10,10 @@ class Process:
         out = []
         for path in paths:
             filename = Path(path).stem
-            docs = self.duckling.run(
+            state = self.duckling.run(
                 path,
                 namespace=filename,
             )
+            docs = state["documents"]
             out.extend(docs)
         return out
