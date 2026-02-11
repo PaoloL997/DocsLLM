@@ -43,8 +43,6 @@ async function loadGreeting() {
 function setupEventListeners() {
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
-    const settingsBtn = document.getElementById('settingsBtn');
-    const settingsButton = document.getElementById('settingsButton');
     const modelSelect = document.getElementById('modelSelect');
     const modelMenu = document.getElementById('modelMenu');
     const sidebar = document.getElementById('sidebar');
@@ -63,7 +61,6 @@ function setupEventListeners() {
     console.log('[DEBUG] Elements found:', {
         messageInput: !!messageInput,
         sendBtn: !!sendBtn,
-        settingsButton: !!settingsButton,
         modelSelect: !!modelSelect,
         modelMenu: !!modelMenu,
         sidebar: !!sidebar,
@@ -227,54 +224,6 @@ function setupEventListeners() {
     }
 
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
-
-    if (settingsBtn) {
-        settingsBtn.addEventListener('click', function() {
-            console.log('Settings clicked');
-        });
-    }
-
-    // Settings button event listener
-    if (settingsButton) {
-        settingsButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const settingsModal = document.getElementById('settingsModal');
-            if (settingsModal) {
-                if (settingsModal.classList.contains('open')) {
-                    closeSettingsModal();
-                } else {
-                    openSettingsModal();
-                }
-            }
-        });
-    }
-
-    // Close settings modal when clicking outside
-    document.addEventListener('click', function(e) {
-        const settingsModal = document.getElementById('settingsModal');
-        const settingsMenu = document.getElementById('settingsMenu');
-        if (settingsModal && settingsModal.classList.contains('open')) {
-            if (!settingsButton.contains(e.target) && !settingsMenu.contains(e.target)) {
-                closeSettingsModal();
-            }
-        }
-    });
-                    
-
-    // K input change handler
-    const kInput = document.getElementById('kInput');
-    if (kInput) {
-        kInput.addEventListener('change', function() {
-            const newK = parseInt(this.value) || 4;
-            if (newK < 1) {
-                this.value = 1;
-                newK = 1;
-            }
-            console.log('K value changed to:', newK);
-            updateKValue(newK);
-        });
-    }
 
     if (modelSelect && modelMenu) {
         modelSelect.addEventListener('click', function(e) {
@@ -1182,38 +1131,6 @@ function closeModelDropdown() {
     }
 }
 
-async function updateKValue(newK) {
-    try {
-        console.log('Updating K value to:', newK);
-        
-        // Send update to backend
-        const response = await fetch('/api/update-k/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({ k: newK })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            console.log('K value updated successfully');
-            
-            // If there's an active agent, reinitialize it
-            if (activeCollection) {
-                console.log('Reinitializing agent with new K value:', newK);
-                await initializeAgent(activeCollection.commessa, activeCollection.collection);
-            }
-        } else {
-            console.error('Failed to update K value:', data.error);
-        }
-    } catch (error) {
-        console.error('Error updating K value:', error);
-    }
-}
-
 function selectModel(value, title) {
     const selectedSpan = document.querySelector('.model-selected');
     if (selectedSpan) selectedSpan.textContent = title;
@@ -1229,60 +1146,6 @@ function selectModel(value, title) {
 }
 
 // Settings modal functions
-function openSettingsModal() {
-    const settingsModal = document.getElementById('settingsModal');
-    const settingsButton = document.getElementById('settingsButton');
-    const settingsMenu = document.getElementById('settingsMenu');
-    
-    if (settingsModal && settingsButton && settingsMenu) {
-        // Position the modal relative to the settings button
-        const rect = settingsButton.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-        const menuWidth = 280; // Same as model dropdown
-        
-        // Default position: to the left of the button
-        let left = rect.left - menuWidth - 8;
-        let top = rect.bottom + 8;
-        
-        // Adjust if it goes off the left edge
-        if (left < 8) {
-            left = rect.right + 8;
-        }
-        
-        // Adjust if it goes off the right edge
-        if (left + menuWidth > viewportWidth - 8) {
-            left = viewportWidth - menuWidth - 8;
-        }
-        
-        // Adjust if it goes off the bottom edge
-        if (top + 200 > viewportHeight - 8) { // Estimate menu height
-            top = rect.top - 200 - 8;
-        }
-        
-        // Make sure it doesn't go off the top
-        if (top < 8) {
-            top = 8;
-        }
-        
-        settingsMenu.style.left = left + 'px';
-        settingsMenu.style.top = top + 'px';
-        
-        settingsModal.classList.add('open');
-        settingsButton.classList.add('active');
-    }
-}
-
-function closeSettingsModal() {
-    const settingsModal = document.getElementById('settingsModal');
-    const settingsButton = document.getElementById('settingsButton');
-    
-    if (settingsModal && settingsButton) {
-        settingsModal.classList.remove('open');
-        settingsButton.classList.remove('active');
-    }
-}
-
 function selectSettingsOption(value, title) {
     // Remove previous selection
     document.querySelectorAll('.settings-option').forEach(opt => {

@@ -26,7 +26,7 @@ def search_commesse(request):
             return "Non Definito", "Non Definito"
         try:
             import pandas as pd
-            date_obj = pd.to_datetime(val)
+            date_obj = pd.to_datetime(val, format='%d.%m.%Y')
             formatted_date = date_obj.strftime("%d/%m/%Y")
             status = "Conclusa" if date_obj < datetime.now() else "In Corso"
             return formatted_date, status

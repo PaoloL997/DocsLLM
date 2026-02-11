@@ -1,16 +1,16 @@
 from pathlib import Path
-from duckling.convert import DucklingGeneric
+from duckling.graph import DucklingGraph
 
 
 class Process:
     def __init__(self):
-        self.duckling = DucklingGeneric()
+        self.duckling = DucklingGraph()
 
     def process(self, paths: list):
         out = []
         for path in paths:
             filename = Path(path).stem
-            docs = self.duckling.convert(
+            docs = self.duckling.run(
                 path,
                 namespace=filename,
             )

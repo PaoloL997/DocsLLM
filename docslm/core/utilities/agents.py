@@ -17,44 +17,6 @@ def _idx_to_letters(i: int) -> str:
     return result
 
 
-def update_k(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-    try:
-        data = json.loads(request.body)
-        new_k = data.get('k', 4)
-        
-        if not isinstance(new_k, int) or new_k < 1:
-            return JsonResponse({'error': 'K deve essere un numero intero maggiore di 0'}, status=400)
-
-        # Aggiorna il file di configurazione
-        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
-        if not os.path.exists(config_path):
-            return JsonResponse({'error': 'File di configurazione non trovato'}, status=500)
-
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-        
-        old_k = config.get('k', 4)
-        config['k'] = new_k
-        
-        with open(config_path, "w", encoding="utf-8") as f:
-            yaml.safe_dump(config, f, default_flow_style=False, allow_unicode=True)
-        
-        print(f"[K UPDATE] K value changed from {old_k} to {new_k}")
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'K aggiornato a {new_k}',
-            'k': new_k
-        })
-
-    except Exception as e:
-        print(f"[K UPDATE ERROR] Errore durante l'aggiornamento di K: {str(e)}")
-        return JsonResponse({'error': f'Errore durante l\'aggiornamento di K: {str(e)}'}, status=500)
-
-
 def send_message(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
@@ -151,7 +113,15 @@ def initialize_agent(request):
             config = yaml.safe_load(f)
 
         db_name = f"comm_{commessa}"
-        k_value = config.get('k', 4)
+        
+        # Get k value based on mode
+        default_k = 4
+        if mode in ['veloce', 'ragionamento']:
+            from services.agent import Agent as AgentClass
+            mode_config = AgentClass.MODES.get(mode, {})
+            k_value = mode_config.get('k', default_k)
+        else:
+            k_value = default_k
         
         print(f"[AGENT INIT] Initializing agent with K={k_value}, commessa={commessa}, collection={collection_name}, mode={mode}")
         

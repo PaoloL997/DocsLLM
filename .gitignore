@@ -135,7 +135,7 @@ Thumbs.db
 /static/
 
 # Media files
-/media/
+media/
 
 # Node modules (if using npm/yarn)
 node_modules/

@@ -5,16 +5,14 @@ from graphrag.store.store import Store
 class Agent:
     MODES = {
         'veloce': {
-            'model': 'gpt-4.1-nano',
-            'draw_thinking_level': 'low'
-        },
-        'bilanciata': {
-            'model': 'gpt-5-nano',
-            'draw_thinking_level': 'medium'
+            'model': 'gpt-4.1-mini',
+            'draw_thinking_level': 'low',
+            'k': 4
         },
         'ragionamento': {
             'model': 'gpt-5-mini',
-            'draw_thinking_level': 'high'
+            'draw_thinking_level': 'low',
+            'k': 10
         }
     }
     

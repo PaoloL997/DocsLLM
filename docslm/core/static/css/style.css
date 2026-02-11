@@ -739,10 +739,14 @@ html, body {
     background-color: var(--secondary-color);
     width: 90%;
     max-width: 800px;
+    min-height: 400px;
+    max-height: 80vh;
     border-radius: 20px;
     box-shadow: var(--card-shadow);
     overflow: hidden;
     animation: modalAppear 0.3s ease-out;
+    display: flex;
+    flex-direction: column;
 }
 
 @keyframes modalAppear {
@@ -783,6 +787,23 @@ html, body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Stile scrollbar per modal-body */
+.modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 /* Ensure file list fills modal width */
@@ -1051,7 +1072,7 @@ html, body {
     display: flex;
     flex-direction: column;
     width: 100%;
-    max-width: 880px;
+    max-width: 1144px;
     margin: 0 auto;
     padding: 0 40px 40px;
 }
@@ -1109,7 +1130,7 @@ html, body {
 
 .chat-card {
     width: 100%;
-    max-width: 620px;
+    max-width: 806px;
     background-color: var(--secondary-color);
     border-radius: 28px;
     padding: 24px 24px 20px;
@@ -1125,7 +1146,7 @@ html, body {
     left: 50%;
     transform: translateX(-50%);
     z-index: 100;
-    max-width: 620px;
+    max-width: 806px;
 }
 
 .chat-history {
@@ -1133,7 +1154,7 @@ html, body {
     flex-direction: column;
     gap: 20px;
     width: 100%;
-    max-width: 620px;
+    max-width: 806px;
     padding-bottom: 140px;
 }
 
@@ -1155,7 +1176,7 @@ html, body {
 }
 
 .chat-bubble {
-    max-width: 78%;
+    max-width: 110%;
     padding: 12px 14px;
     border-radius: 18px;
     font-size: 15px;
@@ -1423,6 +1444,17 @@ html, body {
 .model-dropdown-menu.open {
     opacity: 1;
     visibility: visible;
+    transform: translateY(0);
+}
+
+/* Quando la chat card è fixed (dopo il primo messaggio), apri il dropdown verso l'alto */
+.chat-card.fixed .model-dropdown-menu {
+    top: auto;
+    bottom: calc(100% + 8px);
+    transform: translateY(8px);
+}
+
+.chat-card.fixed .model-dropdown-menu.open {
     transform: translateY(0);
 }
 
