@@ -7,6 +7,9 @@ from django.http import JsonResponse
 # In-memory agent store (per session). TODO: replace with Redis.
 AGENT_INSTANCES = {}
 
+# In-memory report cache (token -> {file_buffer, filename, timestamp})
+REPORT_CACHE = {}
+
 
 def _idx_to_letters(i: int) -> str:
     result = ''
@@ -85,24 +88,17 @@ def send_message(request):
         return JsonResponse({'error': f"Errore durante l'invocazione dell'agent: {str(e)}"}, status=500)
 
 
-def generate_summary(request):
+def generate_report(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
     try:
-        import io
-        from django.http import FileResponse
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.units import inch
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-        from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
-        import markdown
+        if 'file' not in request.FILES:
+            return JsonResponse({'error': 'File Excel richiesto'}, status=400)
         
-        data = json.loads(request.body)
-        commessa = data.get('commessa', '').strip()
-        collection = data.get('collection', '').strip()
+        excel_file = request.FILES['file']
+        commessa = request.POST.get('commessa', '').strip()
+        collection = request.POST.get('collection', '').strip()
         
         if not commessa or not collection:
             return JsonResponse({'error': 'Commessa e collection richiesti'}, status=400)
@@ -113,83 +109,82 @@ def generate_summary(request):
         if not agent:
             return JsonResponse({'error': 'Agent non trovato'}, status=400)
         
-        # Usa la funzione summarize dell'agent
-        result = agent.summarize()
-        summary_text = result.get('response', '') if isinstance(result, dict) else str(result)
+        # Get user_id from session
+        user_id = request.session.get('username', None)
         
-        # Genera il nome del file
-        collection_clean = collection.replace('_', ' ')
-        filename = f"Report_commessa_{commessa}_notebook_{collection_clean}.pdf"
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_file:
+            for chunk in excel_file.chunks():
+                tmp_file.write(chunk)
+            tmp_file_path = tmp_file.name
         
-        # Crea il PDF in memoria
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72,
-                                topMargin=72, bottomMargin=18)
+        result = agent.report(tmp_file_path, user_id=user_id)
         
-        # Stili
-        styles = getSampleStyleSheet()
-        styles.add(ParagraphStyle(name='Justify', alignment=TA_JUSTIFY))
+        os.remove(tmp_file_path)
         
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            textColor=colors.HexColor('#d4704d'),
-            spaceAfter=30,
-            alignment=TA_CENTER
-        )
+        # Store the report in cache with a token
+        import uuid
+        import time
+        token = str(uuid.uuid4())
+        REPORT_CACHE[token] = {
+            'file_buffer': result['file_buffer'],
+            'filename': result['filename'],
+            'timestamp': time.time(),
+            'session_key': session_key
+        }
         
-        # Converti markdown in HTML semplice per ReportLab
-        html_text = markdown.markdown(summary_text)
-        html_text = html_text.replace('<h1>', '<para fontSize="18" textColor="#d4704d"><b>')
-        html_text = html_text.replace('</h1>', '</b></para><br/>')
-        html_text = html_text.replace('<h2>', '<para fontSize="16" textColor="#d4704d"><b>')
-        html_text = html_text.replace('</h2>', '</b></para><br/>')
-        html_text = html_text.replace('<h3>', '<para fontSize="14"><b>')
-        html_text = html_text.replace('</h3>', '</b></para><br/>')
-        html_text = html_text.replace('<strong>', '<b>')
-        html_text = html_text.replace('</strong>', '</b>')
-        html_text = html_text.replace('<em>', '<i>')
-        html_text = html_text.replace('</em>', '</i>')
-        html_text = html_text.replace('<p>', '')
-        html_text = html_text.replace('</p>', '<br/>')
-        html_text = html_text.replace('<ul>', '')
-        html_text = html_text.replace('</ul>', '')
-        html_text = html_text.replace('<li>', '• ')
-        html_text = html_text.replace('</li>', '<br/>')
-        
-        # Contenuto del PDF
-        story = []
-        
-        # Titolo
-        title = Paragraph(f"Report - Commessa {commessa}", title_style)
-        story.append(title)
-        story.append(Spacer(1, 12))
-        
-        # Sottotitolo
-        subtitle = Paragraph(f"<i>Notebook: {collection_clean}</i>", styles['Normal'])
-        story.append(subtitle)
-        story.append(Spacer(1, 24))
-        
-        # Contenuto del summary
-        try:
-            paragraphs = html_text.split('<br/>')
-            for para in paragraphs:
-                if para.strip():
-                    p = Paragraph(para, styles['Normal'])
-                    story.append(p)
-                    story.append(Spacer(1, 12))
-        except Exception as e:
-            p = Paragraph(summary_text.replace('\n', '<br/>'), styles['Normal'])
-            story.append(p)
-        
-        # Genera il PDF
-        doc.build(story)
-        buffer.seek(0)
-        
-        # Ritorna il file PDF
-        return FileResponse(buffer, as_attachment=True, filename=filename, content_type='application/pdf')
+        return JsonResponse({
+            'success': True,
+            'message': f'Report elaborato con successo',
+            'commessa': commessa,
+            'collection': collection,
+            'filename': result.get('filename'),
+            'download_token': token,
+            'query_count': result.get('query_count')
+        })
     
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def download_report(request):
+    """Serve a report file from cache using token"""
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+    try:
+        token = request.GET.get('token', '')
+        filename = request.GET.get('filename', '')
+        
+        if not token or token not in REPORT_CACHE:
+            return JsonResponse({'error': 'Report not found or expired'}, status=404)
+        
+        report_data = REPORT_CACHE[token]
+        
+        # Optional: verify session security
+        session_key = request.session.session_key
+        if report_data.get('session_key') != session_key:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+        
+        # Get file buffer and reset position
+        file_buffer = report_data['file_buffer']
+        file_buffer.seek(0)
+        
+        # Stream the file
+        from django.http import FileResponse
+        response = FileResponse(
+            file_buffer,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{report_data["filename"]}"'
+        
+        # Clean up cache entry after download
+        del REPORT_CACHE[token]
+        
+        return response
+        
     except Exception as e:
         import traceback
         traceback.print_exc()

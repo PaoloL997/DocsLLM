@@ -1,5 +1,5 @@
 from .utilities.auth import index, user_login, get_greeting
-from .utilities.agents import send_message, initialize_agent, generate_summary, AGENT_INSTANCES
+from .utilities.agents import send_message, initialize_agent, generate_report, download_report, AGENT_INSTANCES
 from .utilities.files import (
     check_path,
     list_job_files,
@@ -7,6 +7,7 @@ from .utilities.files import (
     list_collections,
     create_collection,
     delete_collection_file,
+    delete_collection,
 )
 from .utilities.search import search_commesse
 
@@ -16,8 +17,8 @@ __all__ = [
     "user_login",
     "send_message",
     "initialize_agent",
-    "generate_summary",
-
+    "generate_report",
+    "download_report",
     "AGENT_INSTANCES",
     "check_path",
     "list_job_files",
@@ -25,5 +26,6 @@ __all__ = [
     "list_collections",
     "create_collection",
     "delete_collection_file",
+    "delete_collection",
     "search_commesse",
 ]

@@ -26,7 +26,7 @@ class ManageDB:
     def create_database(self, database: str):
         db_name = f"comm_{database}"
         return create_database(self.config.get("uri"), db_name)
-    
+
     def create_collection(
             self,
             database: str,

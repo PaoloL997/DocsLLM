@@ -262,6 +262,11 @@ def create_collection(request):
         collection_name = '_'.join(parts)
         if not collection_name:
             return JsonResponse({'error': 'Collection name is invalid'}, status=400)
+        
+        # Validate collection name - only letters, numbers, and underscores allowed
+        import re
+        if not re.match(r'^[a-zA-Z0-9_]+$', collection_name):
+            return JsonResponse({'error': 'Il nome della collection può contenere solo lettere, numeri e underscore. Caratteri non consentiti: &, !, @, #, etc.'}, status=400)
 
         import sys
         import yaml
@@ -292,7 +297,13 @@ def create_collection(request):
             'selected_files': full_paths
         })
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        import traceback
+        traceback.print_exc()
+        error_msg = str(e)
+        # Extract user-friendly message from Milvus error
+        if 'Invalid collection name' in error_msg:
+            error_msg = 'Il nome della collection contiene caratteri non consentiti. Usa solo lettere, numeri e underscore.'
+        return JsonResponse({'error': error_msg}, status=500)
 
 
 def list_collection_files(request):
@@ -433,6 +444,59 @@ def delete_collection_file(request):
             'commessa': commessa,
             'collection': collection_name,
             'remaining_files': files_data
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def delete_collection(request):
+    """DELETE an entire collection (notebook).
+    POST JSON: { commessa, collection }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        commessa = data.get('commessa', '').strip()
+        collection_name = data.get('collection', '').strip()
+
+        if not commessa or not collection_name:
+            return JsonResponse({'error': 'Commessa and collection are required'}, status=400)
+
+        import yaml
+        from pymilvus import Collection, connections
+        
+        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+        if not os.path.exists(config_path):
+            return JsonResponse({'error': 'Configuration file not found'}, status=500)
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        
+        uri = config.get('uri')
+        if not uri:
+            return JsonResponse({'error': 'URI not configured'}, status=500)
+
+        # Connect to Milvus
+        host = uri.split("://")[1].split(":")[0]
+        port = int(uri.split(":")[-1])
+        connections.connect(host=host, port=port)
+
+        # Use the correct database name
+        db_name = f"comm_{commessa}"
+        from pymilvus import db as milvus_db
+        milvus_db.using_database(db_name)
+
+        # Drop the collection
+        collection_obj = Collection(collection_name)
+        collection_obj.drop()
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Collection {collection_name} deleted successfully',
+            'commessa': commessa,
+            'collection': collection_name
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

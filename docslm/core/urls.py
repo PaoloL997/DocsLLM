@@ -13,8 +13,10 @@ urlpatterns = [
     path('api/list-job-files/', views.list_job_files, name='list_job_files'),
     path('api/list-collection-files/', views.list_collection_files, name='list_collection_files'),
     path('api/delete-collection-file/', views.delete_collection_file, name='delete_collection_file'),
+    path('api/delete-collection/', views.delete_collection, name='delete_collection'),
     path('api/create-collection/', views.create_collection, name='create_collection'),
     path('api/initialize-agent/', views.initialize_agent, name='initialize_agent'),
-    path('api/generate-summary/', views.generate_summary, name='generate_summary'),
+    path('api/generate-report/', views.generate_report, name='generate_report'),
+    path('api/download-report/', views.download_report, name='download_report'),
     path('api/check-path/', views.check_path, name='check_path'),
 ]

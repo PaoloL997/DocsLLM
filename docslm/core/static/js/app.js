@@ -1,6 +1,5 @@
 // Get greeting on page load
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[DEBUG] DOMContentLoaded fired');
     try {
         loadGreeting();
         setupEventListeners();
@@ -14,15 +13,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const modals = document.querySelectorAll('.create-collection-modal, .modal');
             modals.forEach(modal => {
                 if (window.getComputedStyle(modal).display !== 'none' && !modal.classList.contains('open')) {
-                    console.log('[DEBUG] Hiding unexpected modal:', modal.id);
                     modal.style.display = 'none';
                 }
             });
             document.body.style.pointerEvents = 'auto';
-            console.log('[DEBUG] UI initialization complete');
         }, 50);
     } catch (error) {
-        console.error('[DEBUG] Error during initialization:', error);
+        console.error('Error during initialization:', error);
     }
 });
 
@@ -38,6 +35,96 @@ async function loadGreeting() {
     if (greetingElement) {
         greetingElement.textContent = 'Accedi al tuo account';
     }
+}
+
+async function generateSummary() {
+    if (!activeCollection) {
+        showAgentInactive();
+        return;
+    }
+    
+    // Mostra la modal di upload
+    const reportModal = document.getElementById('reportUploadModal');
+    if (reportModal) {
+        reportModal.classList.add('open');
+    }
+}
+
+async function handleReportFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reportModal = document.getElementById('reportUploadModal');
+    if (reportModal) {
+        reportModal.classList.remove('open');
+    }
+
+    const summaryBtn = document.getElementById('summaryBtn');
+    if (summaryBtn) {
+        summaryBtn.disabled = true;
+    }
+
+    ensureChatVisible();
+    const loaderRow = appendLoader();
+
+    try {
+        if (!activeCollection) {
+            throw new Error('No collection selected');
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('commessa', activeCollection.commessa);
+        formData.append('collection', activeCollection.collection);
+
+        const response = await fetch('/api/generate-report/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: formData
+        });
+
+        if (loaderRow) {
+            if (loaderRow._timer) clearInterval(loaderRow._timer);
+            loaderRow.remove();
+        }
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Create banner with download button
+            const bannerHTML = `
+                <div style="background: white; border-radius: 16px; padding: 24px; margin: 12px 0; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); border: 1px solid #f0f0f0; backdrop-filter: blur(10px); background: rgba(255, 255, 255, 0.95);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px;">
+                        <div style="flex: 1;">
+                            <div style="font-size: 16px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; line-height: 1.4;">${data.filename || 'report.xlsx'}</div>
+                            <div style="font-size: 13px; color: #888; display: flex; align-items: center; gap: 8px;\">\n                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path>\n                                </svg>\n                                ${data.query_count || 0} domande elaborate\n                            </div>\n                        </div>\n                        <button onclick="downloadReportFile('${data.download_token}', '${data.filename}')" style="background: linear-gradient(135deg, var(--accent-color) 0%, rgba(212, 112, 77, 0.8) 100%); color: white; border: none; padding: 12px 20px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.3s ease; white-space: nowrap; box-shadow: 0 4px 12px rgba(212, 112, 77, 0.25); flex-shrink: 0;\" onmouseover=\"this.style.boxShadow='0 8px 24px rgba(212, 112, 77, 0.4)'; this.style.transform='translateY(-2px)';\" onmouseout=\"this.style.boxShadow='0 4px 12px rgba(212, 112, 77, 0.25)'; this.style.transform='translateY(0)';\">Download</button>\n                    </div>\n                </div>\n            `;
+            appendMessage('assistant', bannerHTML, true);
+        } else {
+            appendMessage('assistant', `Errore: ${data.error || 'Impossibile elaborare il report'}`);
+        }
+    } catch (error) {
+        console.error('Error generating report:', error);
+        if (loaderRow) {
+            if (loaderRow._timer) clearInterval(loaderRow._timer);
+            loaderRow.remove();
+        }
+        appendMessage('assistant', `Errore: ${error.message}`);
+    } finally {
+        if (summaryBtn) {
+            summaryBtn.disabled = false;
+        }
+    }
+}
+
+// Download report file when requested
+function downloadReportFile(token, filename) {
+    const link = document.createElement('a');
+    link.href = `/api/download-report/?token=${token}&filename=${filename}`;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 function setupEventListeners() {
@@ -58,20 +145,6 @@ function setupEventListeners() {
     const closeCollectionModal = document.getElementById('closeCollectionModal');
     const createCollectionModal = document.getElementById('createCollectionModal');
     const createCollectionConfirmBtn = document.getElementById('createCollectionConfirmBtn');
-
-    console.log('[DEBUG] Elements found:', {
-        messageInput: !!messageInput,
-        sendBtn: !!sendBtn,
-        modelSelect: !!modelSelect,
-        modelMenu: !!modelMenu,
-        sidebar: !!sidebar,
-        loginBtn: !!loginBtn
-    });
-    
-    // Add global click handler for debugging
-    document.addEventListener('click', function(e) {
-        console.log('[DEBUG] Click detected on:', e.target.tagName, e.target.id || e.target.className);
-    }, true);
 
     if (sidebar && sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
@@ -166,6 +239,7 @@ function setupEventListeners() {
     // Modal click outside to close
     if (createCollectionModal) {
         createCollectionModal.addEventListener('click', (e) => {
+            if (isProcessing) return; // Don't close during processing
             if (e.target === createCollectionModal) {
                 closeCreateCollectionModalFunc();
             }
@@ -193,13 +267,71 @@ function setupEventListeners() {
         });
     }
 
-    if (closeCollectionModal && collectionModal) {
-        closeCollectionModal.addEventListener('click', () => {
-            collectionModal.classList.remove('open');
+    // Event listeners per i nuovi pulsanti del modal collection
+    const deleteAllDocsBtn = document.getElementById('deleteAllDocsBtn');
+
+    if (deleteAllDocsBtn) {
+        deleteAllDocsBtn.addEventListener('click', async () => {
+            const modalTitle = document.getElementById('modalCollectionTitle');
+            const collectionName = modalTitle.textContent.replace('Notebook: ', '');
+            
+            // Get commessa from current context (from the sidebar or a data attribute)
+            // We need to find the current commessa - let's use a different approach
+            // by passing it through a data attribute on the modal
+            const modal = document.getElementById('collectionModal');
+            const commessa = modal.getAttribute('data-commessa');
+            const collection = modal.getAttribute('data-collection');
+            
+            if (!commessa || !collection) {
+                console.error('Commessa or collection not found');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/delete-collection/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        commessa: commessa,
+                        collection: collection
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    console.error('Error deleting collection:', data.error);
+                    alert(`Errore: ${data.error || 'Impossibile eliminare il notebook'}`);
+                    return;
+                }
+                
+                // Mostra il banner di conferma
+                showDeleteConfirmationBanner(collectionName);
+                
+                // Chiudi il modal
+                modal.classList.remove('open');
+                
+                // Ricarica la pagina dopo un breve delay
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+                
+            } catch (error) {
+                console.error('Error deleting collection:', error);
+                alert('Errore durante l\'eliminazione del notebook');
+            }
         });
     }
 
     window.addEventListener('click', (e) => {
+        if (isProcessing) return; // Don't close modal during processing
+        
+        const createModal = document.getElementById('createCollectionModal');
+        const reportModal = document.getElementById('reportUploadModal');
+        
         if (e.target === jobModal) {
             if (jobModal.classList.contains('open')) {
                 jobModal.classList.remove('open');
@@ -208,6 +340,38 @@ function setupEventListeners() {
         if (collectionModal && e.target === collectionModal) {
             if (collectionModal.classList.contains('open')) {
                 collectionModal.classList.remove('open');
+            }
+        }
+        if (createModal && e.target === createModal) {
+            if (createModal.classList.contains('open')) {
+                createModal.classList.remove('open');
+            }
+        }
+        if (reportModal && e.target === reportModal) {
+            if (reportModal.classList.contains('open')) {
+                reportModal.classList.remove('open');
+            }
+        }
+    });
+
+    // Allow closing modals with ESC key
+    document.addEventListener('keydown', (e) => {
+        if (isProcessing) return; // Don't close modal during processing
+        
+        if (e.key === 'Escape') {
+            const createModal = document.getElementById('createCollectionModal');
+            const reportModal = document.getElementById('reportUploadModal');
+            if (createModal && createModal.classList.contains('open')) {
+                createModal.classList.remove('open');
+            }
+            if (jobModal && jobModal.classList.contains('open')) {
+                jobModal.classList.remove('open');
+            }
+            if (collectionModal && collectionModal.classList.contains('open')) {
+                collectionModal.classList.remove('open');
+            }
+            if (reportModal && reportModal.classList.contains('open')) {
+                reportModal.classList.remove('open');
             }
         }
     });
@@ -228,6 +392,32 @@ function setupEventListeners() {
     
     if (summaryBtn) {
         summaryBtn.addEventListener('click', generateSummary);
+    }
+
+    // Setup Report Upload Modal
+    const reportUploadModal = document.getElementById('reportUploadModal');
+    const reportUploadClose = document.getElementById('reportUploadClose');
+    const reportUploadBtn = document.getElementById('reportUploadBtn');
+
+    if (reportUploadClose) {
+        reportUploadClose.addEventListener('click', () => {
+            if (reportUploadModal) {
+                reportUploadModal.classList.remove('open');
+            }
+        });
+    }
+
+    if (reportUploadBtn) {
+        reportUploadBtn.addEventListener('click', () => {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.xlsx,.xls';
+            
+            fileInput.addEventListener('change', (e) => {
+                handleReportFileUpload(e);
+            });
+            fileInput.click();
+        });
     }
 
     if (modelSelect && modelMenu) {
@@ -265,13 +455,9 @@ async function performSearch(query, autoOpen = false) {
         return;
     }
     
-    console.log('Searching for:', query); // Debug log
-    
     try {
         const response = await fetch(`/api/search-commesse/?q=${encodeURIComponent(query)}`);
         const data = await response.json();
-        
-        console.log('Search response:', data); // Debug log
         
         if (data.results) {
             if (autoOpen) {
@@ -466,12 +652,10 @@ function renderCollections(collections, container, commessaCode) {
             // If it wasn't selected, select it now and initialize agent
             if (!wasSelected) {
                 card.classList.add('selected');
-                console.log('Selected collection:', collection.name);
                 
                 // Initialize agent
                 await initializeAgent(commessaCode, collection.name);
             } else {
-                console.log('Deselected collection:', collection.name);
                 activeCollection = null;
                 showAgentInactive();
                 disableSendButton();
@@ -502,6 +686,8 @@ let currentCommessaCode = null;
 let modalSelectedFiles = [];
 // Active collection
 let activeCollection = null;
+// Flag to track if documents are being processed
+let isProcessing = false;
 
 function showAgentLoading() {
     const loading = document.querySelector('.agent-loading');
@@ -589,8 +775,6 @@ async function initializeAgent(commessa, collectionName) {
         const modelSelected = document.querySelector('.model-selected');
         const mode = modelSelected ? modelSelected.textContent.trim().toLowerCase() : 'veloce';
         
-        console.log('Initializing agent with:', { commessa, collectionName, mode });
-        
         const response = await fetch('/api/initialize-agent/', {
             method: 'POST',
             headers: {
@@ -612,7 +796,6 @@ async function initializeAgent(commessa, collectionName) {
                 collection: collectionName,
                 mode: mode
             };
-            console.log('Agent initialized successfully:', data);
             // Show success message
             showAgentSuccess();
             // enable sending now that an agent is active
@@ -642,22 +825,21 @@ function submitCreateCollection() {
     const confirmBtn = document.getElementById('createCollectionConfirmBtn');
     const body = document.querySelector('.create-collection-body');
     
-    console.log('submitCreateCollection called');
-    
-    if (!input || !currentCommessaCode) {
-        console.log('Missing input or commessa code');
+    if (!currentCommessaCode) {
+        return;
+    }
+
+    if (!input) {
         return;
     }
 
     const rawName = input.value.trim();
     if (!rawName) {
-        console.log('Empty collection name');
         return;
     }
 
     const sanitizedName = sanitizeCollectionName(rawName);
     if (!sanitizedName) {
-        console.log('Invalid sanitized name');
         return;
     }
 
@@ -745,13 +927,18 @@ function openCreateCollectionModal(commessaCode) {
     
     if (modal && input) {
         input.value = '';
+        input.disabled = false;
+        input.style.opacity = '1';
+        input.style.cursor = 'text';
         // reset selected files and update counter
         modalSelectedFiles = [];
         renderSelectedFilesCounter();
         // load job files for this commessa into the modal browser
         loadJobFiles(commessaCode, '');
         modal.classList.add('open');
-        setTimeout(() => input.focus(), 200);
+        if (!collectionName) {
+            setTimeout(() => input.focus(), 200);
+        }
     }
 }
 
@@ -765,14 +952,17 @@ function closeCreateCollectionModalFunc() {
 }
 
 async function createCollection(commessaCode, collectionName) {
-    console.log('createCollection called with:', { commessaCode, collectionName, files: modalSelectedFiles });
-    
     const confirmBtn = document.getElementById('createCollectionConfirmBtn');
     const body = document.querySelector('.create-collection-body');
     
-    console.log('Elements found:', { confirmBtn: !!confirmBtn, body: !!body });
+    const loadingLabel = 'Creazione in corso...';
+    const loadingDesc = 'Processing documenti e creazione collection';
+    const successLabel = 'Creazione completata!';
+    const successDesc = 'Notebook creato con successo';
     
     try {
+        isProcessing = true; // Prevent modal closing during processing
+        
         // Disable button and show loading state
         if (confirmBtn) {
             confirmBtn.disabled = true;
@@ -786,8 +976,8 @@ async function createCollection(commessaCode, collectionName) {
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:60px 40px;height:100%;">
                     <div style="width:48px;height:48px;border:4px solid rgba(212, 112, 77, 0.2);border-top:4px solid var(--accent-color);border-radius:50%;animation:spin 1s linear infinite;"></div>
                     <div style="text-align:center;">
-                        <div style="font-size:16px;font-weight:600;color:var(--text-color);margin-bottom:8px;">Creazione in corso...</div>
-                        <div style="font-size:13px;color:var(--text-light);">Processing documenti e creazione collection</div>
+                        <div style="font-size:16px;font-weight:600;color:var(--text-color);margin-bottom:8px;">${loadingLabel}</div>
+                        <div style="font-size:13px;color:var(--text-light);">${loadingDesc}</div>
                     </div>
                 </div>
                 <style>
@@ -796,8 +986,13 @@ async function createCollection(commessaCode, collectionName) {
                     }
                 </style>
             `;
-            console.log('Loading spinner shown');
         }
+        
+        const requestBody = {
+            commessa: commessaCode,
+            collection_name: collectionName,
+            files: modalSelectedFiles
+        };
         
         const response = await fetch('/api/create-collection/', {
             method: 'POST',
@@ -805,16 +1000,11 @@ async function createCollection(commessaCode, collectionName) {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({
-                commessa: commessaCode,
-                collection_name: collectionName,
-                files: modalSelectedFiles
-            })
+            body: JSON.stringify(requestBody)
         });
         
-        console.log('Response received:', response.status);
         const data = await response.json();
-        console.log('Response data:', data);
+        console.log('Create collection response:', JSON.stringify(data));
         
         if (data.success) {
             // Show success message
@@ -826,8 +1016,8 @@ async function createCollection(commessaCode, collectionName) {
                             <polyline points="22 4 12 14.01 9 11.01"></polyline>
                         </svg>
                         <div>
-                            <div style="font-size:16px;font-weight:600;color:var(--text-color);margin-bottom:4px;">Creazione completata!</div>
-                            <div style="font-size:13px;color:var(--text-light);">Notebook creato con successo</div>
+                            <div style="font-size:16px;font-weight:600;color:var(--text-color);margin-bottom:4px;">${successLabel}</div>
+                            <div style="font-size:13px;color:var(--text-light);">${successDesc}</div>
                         </div>
                     </div>
                 `;
@@ -839,8 +1029,10 @@ async function createCollection(commessaCode, collectionName) {
             }, 1500);
         } else {
             // Show error message
+            isProcessing = false; // Allow closing modal on error
             if (body) {
-                body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore:</strong> ${data.error}</div>`;
+                const errorMsg = data.error || data.message || JSON.stringify(data) || 'Errore sconosciuto nella creazione della collection';
+                body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore:</strong> ${errorMsg}</div>`;
             }
             if (confirmBtn) {
                 confirmBtn.disabled = false;
@@ -850,6 +1042,7 @@ async function createCollection(commessaCode, collectionName) {
         }
     } catch (error) {
         console.error('Error creating collection:', error);
+        isProcessing = false; // Allow closing modal on error
         if (body) {
             body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore di connessione:</strong> ${error.message}</div>`;
         }
@@ -893,6 +1086,10 @@ async function showCollectionDetails(collection, commessa) {
     const details = document.getElementById('modalCollectionDetails');
     if (!modal || !title || !details) return;
     title.textContent = `Notebook: ${collection.displayName}`;
+    
+    // Salva i dati nel modal per uso successivo
+    modal.setAttribute('data-commessa', commessa);
+    modal.setAttribute('data-collection', collection.name);
     
     // Mostra caricamento (span across both columns)
     details.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-light);">Caricamento file...</div>';
@@ -962,8 +1159,6 @@ async function deleteCollectionFile(commessa, collectionName, filename) {
             alert(`Errore: ${data.error || 'Impossibile eliminare il file'}`);
             return;
         }
-
-        console.log('File deleted successfully:', filename);
         
         // Mostra il banner di conferma
         showDeleteConfirmationBanner(filename);
@@ -1024,14 +1219,11 @@ function autoResizeTextarea(textarea) {
 async function loadJobFiles(commessa, subpath = '') {
     const body = document.querySelector('.create-collection-body');
     if (!body) return;
-    console.log('loadJobFiles called', { commessa, subpath });
     body.innerHTML = `<div style="padding:12px;color:var(--text-light)">Caricamento file...</div>`;
     try {
         const url = `/api/list-job-files/?commessa=${encodeURIComponent(commessa)}&subpath=${encodeURIComponent(subpath)}`;
-        console.log('fetch url', url);
         const resp = await fetch(url);
         const data = await resp.json();
-        console.log('list-job-files response', data);
         if (data.error) {
             body.innerHTML = `<div style="padding:12px;color:red">Errore: ${data.error}</div>`;
             return;
@@ -1241,7 +1433,6 @@ function selectModel(value, title) {
     
     // If there's an active agent, reinitialize it with the new mode
     if (activeCollection) {
-        console.log('Reinitializing agent with new mode:', value);
         initializeAgent(activeCollection.commessa, activeCollection.collection);
     }
 }
@@ -1258,8 +1449,6 @@ function selectSettingsOption(value, title) {
     if (selectedOption) {
         selectedOption.classList.add('selected');
     }
-    
-    console.log('Settings option selected:', value, title);
     
     // Here you can add logic to handle different settings options
     // For now, we just close the modal
@@ -1299,7 +1488,7 @@ function ensureChatVisible() {
     }
 }
 
-function appendMessage(role, text) {
+function appendMessage(role, text, isHtml) {
     const chatHistory = document.getElementById('chatHistory');
     if (!chatHistory) return null;
     const row = document.createElement('div');
@@ -1308,7 +1497,11 @@ function appendMessage(role, text) {
     bubble.className = 'chat-bubble';
     // render markdown only for assistant, plain text for user
     if (role === 'assistant') {
-        bubble.innerHTML = renderMarkdown(text || '');
+        if (isHtml) {
+            bubble.innerHTML = text || '';
+        } else {
+            bubble.innerHTML = renderMarkdown(text || '');
+        }
     } else {
         bubble.textContent = text;
     }
@@ -1595,65 +1788,6 @@ function appendLoader() {
     }, 50);
 
     return row;
-}
-
-async function generateSummary() {
-    if (!activeCollection) {
-        showAgentInactive();
-        return;
-    }
-    
-    const summaryBtn = document.getElementById('summaryBtn');
-    if (summaryBtn) {
-        summaryBtn.disabled = true;
-    }
-    
-    ensureChatVisible();
-    const loaderRow = appendLoader();
-    
-    try {
-        const response = await fetch('/api/generate-summary/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify({
-                commessa: activeCollection.commessa,
-                collection: activeCollection.collection
-            })
-        });
-        
-        if (loaderRow) {
-            if (loaderRow._timer) clearInterval(loaderRow._timer);
-            loaderRow.remove();
-        }
-        
-        if (response.ok && response.headers.get('content-type').includes('application/pdf')) {
-            // Il backend ha ritornato un PDF
-            const blob = await response.blob();
-            const collection_clean = activeCollection.collection.replace(/_/g, ' ');
-            const filename = `Report_commessa_${activeCollection.commessa}_notebook_${collection_clean}.pdf`;
-            
-            // Mostra il banner con il pulsante di download
-            appendSummaryDownloadBanner(filename, blob);
-        } else {
-            // Errore
-            const data = await response.json();
-            appendMessage('assistant', `Errore: ${data.error || 'Impossibile generare il riassunto'}`);
-        }
-    } catch (error) {
-        console.error('Error generating summary:', error);
-        if (loaderRow) {
-            if (loaderRow._timer) clearInterval(loaderRow._timer);
-            loaderRow.remove();
-        }
-        appendMessage('assistant', 'Errore nella generazione del riassunto.');
-    } finally {
-        if (summaryBtn) {
-            summaryBtn.disabled = false;
-        }
-    }
 }
 
 function appendSummaryDownloadBanner(filename, blob) {

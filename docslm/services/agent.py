@@ -1,7 +1,8 @@
 from graphrag.graph.agent import GraphRAG
 from graphrag.store.store import Store
-from langchain_core.documents import Document
-
+import pandas as pd
+from datetime import datetime
+from io import BytesIO
 
 class Agent:
     MODES = {
@@ -55,66 +56,46 @@ class Agent:
     def invoke(self, query: str, user_id: str | None = None) -> str:
         return self.agent.run(query, user_id)
 
-
-    def summarize(self) -> str:
-        summary_raw = self.agent.store.query(
-            expression='namespace == "summary"',
-            fields=["text"],
-            limit=1
-        )
-        if not summary_raw:
-            return {
-                'query': "Give me a summary",
-                'refined_query': "Give me a summary",
-                'response': "Errore durante la generazione del riassunto. Contattare l'assistenza.",
-                'context': None,
-                'user_id': None,
-            }
-        summary = summary_raw[0]["text"]
+    def report(self, path: str, user_id: str | None = None) -> dict:
+        """Process Excel file with queries and generate report in memory"""
+        data = pd.read_excel(path)
+        queries = data['queries'].tolist()
         
-        # Estrai info pulite da database e collection
-        commessa = self.agent.store.database.replace("comm_", "")
-        notebook = self.agent.store.collection.replace("_", " ")
+        responses = {}
+        for query in queries:
+            state = self.invoke(
+                query=query,
+                user_id=user_id
+            )
+            response = state['response']
+            responses[query] = response
         
-        response = self.agent.llm.invoke(
-            f"""# Role
-Sei un assistente esperto nella redazione di documentazione tecnica e reportistica aziendale. Il tuo obiettivo è trasformare note disordinate in riassunti professionali ad alta leggibilità, utilizzando una formattazione Markdown avanzata ma pulita.
-
-# Task
-Genera un riassunto strutturato basato sui seguenti dati:
-- **Commessa:** {commessa}
-- **Notebook:** {notebook}
-- **Contenuto:** {summary}
-
-# Struttura dell'Output (Obbligatoria)
-Per garantire la massima chiarezza, organizza la risposta seguendo rigorosamente questo schema:
-
-## 1. Intestazione & Introduzione
-Crea un titolo distintivo (es. ## Report Attività: [Nome Commessa]). Inserisci un paragrafo introduttivo che colleghi la commessa al notebook specifico, fornendo il contesto generale dell'operazione.
-
-## 2. Punti Chiave e Aree Tematiche
-Suddividi il contenuto in Sottotitoli di terzo livello (###). Ogni sezione deve rappresentare un pilastro del riassunto (es. ### Stato Avanzamento, ### Specifiche Tecniche, ### Criticità Riscontrate). Sotto ogni sottotitolo, usa brevi paragrafi descrittivi.
-
-## 3. Analisi Dettagliata
-Sviluppa i concetti più complessi in paragrafi fluidi e ben articolati. Evita l'abuso di liste puntate; se necessario, usa il grassetto all'interno del testo per evidenziare termini tecnici, scadenze, nomi di responsabili o decisioni chiave.
-
-## 4. Sintesi Operativa (Highlight)
-Usa una linea orizzontale (---) per separare questa sezione, poi concludi con un Blockquote (>). All'interno del blocco, scrivi una singola frase o un breve elenco che riassuma l'azione immediata da compiere o la conclusione principale del documento.
-
-# Guidelines Finali
-- No Tabelle: Non utilizzare tabelle.
-- No Liste Massive: Limita le liste puntate allo stretto necessario (massimo 2-3 punti per sezione).
-- Stile: Italiano professionale, asciutto e orientato al risultato.
-- Precisione: Non tralasciare dettagli tecnici presenti nel testo originale.
-"""
-        )
+        # Create output DataFrame
+        out = pd.DataFrame({
+            'query': list(responses.keys()),
+            'response': list(responses.values())
+        })
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_filename = f'report_{timestamp}.xlsx'
+        
+        # Save to BytesIO instead of disk
+        excel_buffer = BytesIO()
+        out.to_excel(excel_buffer, index=False, engine='openpyxl')
+        excel_buffer.seek(0)
+        
         return {
-            'query': "Give me a summary",
-            'refined_query': "Give me a summary",
-            'response': response.content if hasattr(response, 'content') else str(response),
+            'query': 'Generate report',
+            'refined_query': 'Generate report',
+            'response': f'Report generato da {len(queries)} queries.',
             'context': None,
-            'user_id': None,
+            'user_id': user_id,
+            'file_buffer': excel_buffer,
+            'filename': output_filename,
+            'query_count': len(queries)
         }
-        
+
+    
 
         
