@@ -1,0 +1,153 @@
+/* ================================================================
+   RESPONSIVE DESIGN
+   ================================================================ */
+
+/* Tablet Devices */
+@media (max-width: 768px) {
+    .layout {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .sidebar-nav {
+        flex-direction: row;
+        align-items: center;
+        gap: 12px;
+        flex: 1;
+    }
+
+    .sidebar-links {
+        flex-direction: row;
+        gap: 12px;
+    }
+
+    .sidebar-search {
+        width: 100%;
+        order: 3;
+    }
+
+    .sidebar-footer {
+        width: 100%;
+        justify-content: space-between;
+        align-items: stretch;
+    }
+
+    .container {
+        padding: 24px 20px 32px;
+        margin-left: 0;
+    }
+
+    .main {
+        gap: 28px;
+    }
+
+    .greeting-text {
+        font-size: 30px;
+    }
+
+    .chat-card {
+        padding: 20px 20px 18px;
+        border-radius: 24px;
+    }
+
+    .message-input {
+        font-size: 16px;
+        min-height: 22px;
+    }
+
+    .btn-send {
+        width: 34px;
+        height: 34px;
+    }
+    
+    .control-btn {
+        width: 30px;
+        height: 30px;
+    }
+
+    .report-upload-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 24px;
+    }
+
+    .report-upload-content p {
+        text-align: center;
+        font-size: 13px;
+    }
+
+    .report-upload-button {
+        width: 100%;
+        justify-content: center;
+        padding: 13px 20px;
+    }
+}
+
+/* Mobile Devices */
+@media (max-width: 480px) {
+    .header {
+        padding: 24px 0 16px;
+    }
+
+    .plan-banner {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .greeting-section {
+        flex-direction: column;
+        gap: 6px;
+        text-align: center;
+        margin-top: 40px;
+    }
+
+    .greeting-text {
+        font-size: 26px;
+    }
+
+    .chat-card {
+        padding: 20px 18px 16px;
+    }
+
+    .chat-card-footer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        margin-top: 12px;
+        padding-top: 12px;
+    }
+
+    .chat-controls-right {
+        justify-content: space-between;
+    }
+
+    .sidebar {
+        gap: 12px;
+    }
+
+    .sidebar-nav {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .sidebar-links {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .sidebar-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
