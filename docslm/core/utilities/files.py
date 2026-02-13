@@ -341,3 +341,98 @@ def list_collection_files(request):
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+def delete_collection_file(request):
+    """DELETE a file from a collection.
+    POST JSON: { commessa, collection, filename }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        commessa = data.get('commessa', '').strip()
+        collection_name = data.get('collection', '').strip()
+        filename = data.get('filename', '').strip()
+
+        if not commessa or not collection_name or not filename:
+            return JsonResponse({'error': 'Commessa, collection, and filename are required'}, status=400)
+
+        import yaml
+        from pymilvus import Collection, connections
+        
+        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+        if not os.path.exists(config_path):
+            return JsonResponse({'error': 'Configuration file not found'}, status=500)
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        
+        uri = config.get('uri')
+        if not uri:
+            return JsonResponse({'error': 'URI not configured'}, status=500)
+
+        # Connect to Milvus
+        host = uri.split("://")[1].split(":")[0]
+        port = int(uri.split(":")[-1])
+        connections.connect(host=host, port=port)
+
+        # Use the correct database name
+        db_name = f"comm_{commessa}"
+        from pymilvus import db as milvus_db
+        milvus_db.using_database(db_name)
+
+        # Get the collection
+        collection_obj = Collection(collection_name)
+        collection_info = collection_obj.describe()
+        custom_properties = collection_info.get("properties", {})
+
+        # Get current files list
+        files_data = []
+        if "files" in custom_properties:
+            try:
+                files_data = json.loads(custom_properties["files"])
+            except Exception:
+                files_data = []
+
+        # Remove the file from the list
+        files_data = [f for f in files_data if not f.endswith(filename)]
+
+        # Update the properties
+        collection_obj.set_properties({"files": json.dumps(files_data)})
+
+        # Extract namespace from filename (only the filename without path and extension)
+        filename_only = os.path.basename(filename)
+        namespace = os.path.splitext(filename_only)[0]
+        
+        # Delete documents with this namespace from the store
+        try:
+            import sys
+            sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
+            from services.store import Store
+            
+            store = Store(
+                uri=uri,
+                database=db_name,
+                collection=collection_name,
+                k=config.get("k", 4),
+                embedding_model=config.get("embedding_model"),
+            )
+            
+            # Delete documents with matching namespace
+            store.delete(namespace)
+            print(f"Deleted documents with namespace: {namespace}")
+        except Exception as e:
+            print(f"Warning: Could not delete from store: {e}")
+            # Continue anyway - properties were updated
+
+        return JsonResponse({
+            'success': True,
+            'message': f'File {filename} deleted successfully',
+            'commessa': commessa,
+            'collection': collection_name,
+            'remaining_files': files_data
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

@@ -43,6 +43,7 @@ async function loadGreeting() {
 function setupEventListeners() {
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
+    const summaryBtn = document.getElementById('summaryBtn');
     const modelSelect = document.getElementById('modelSelect');
     const modelMenu = document.getElementById('modelMenu');
     const sidebar = document.getElementById('sidebar');
@@ -224,6 +225,10 @@ function setupEventListeners() {
     }
 
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+    
+    if (summaryBtn) {
+        summaryBtn.addEventListener('click', generateSummary);
+    }
 
     if (modelSelect && modelMenu) {
         modelSelect.addEventListener('click', function(e) {
@@ -555,16 +560,24 @@ function hideAgentStatus() {
 
 function enableSendButton() {
     const sendBtn = document.getElementById('sendBtn');
+    const summaryBtn = document.getElementById('summaryBtn');
     if (!sendBtn) return;
     sendBtn.removeAttribute('disabled');
     sendBtn.classList.remove('disabled');
+    if (summaryBtn) {
+        summaryBtn.disabled = false;
+    }
 }
 
 function disableSendButton() {
     const sendBtn = document.getElementById('sendBtn');
+    const summaryBtn = document.getElementById('summaryBtn');
     if (!sendBtn) return;
     sendBtn.setAttribute('disabled', 'true');
     sendBtn.classList.add('disabled');
+    if (summaryBtn) {
+        summaryBtn.disabled = true;
+    }
 }
 
 async function initializeAgent(commessa, collectionName) {
@@ -891,26 +904,114 @@ async function showCollectionDetails(collection, commessa) {
         
         if (data.files && data.files.length > 0) {
             const filesList = data.files.map(file => `
-                <div class="jobfile-row jobfile-file" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border-color);border-radius:6px;background:var(--secondary-color);transition:all 0.2s;">
-                    <div style="display:flex;align-items:center;gap:10px;flex:1;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="jobfile-row jobfile-file" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border-color);border-radius:6px;background:var(--secondary-color);transition:all 0.2s;gap:8px;">
+                    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14,2 14,8 20,8"></polyline>
                             <line x1="16" y1="13" x2="8" y2="13"></line>
                             <line x1="16" y1="17" x2="8" y2="17"></line>
                         </svg>
-                        <span style="font-size:14px;color:var(--text-color);word-break:break-all;">${file}</span>
+                        <span style="font-size:14px;color:var(--text-color);word-break:break-word;flex:1;min-width:0;">${file}</span>
                     </div>
+                    <button class="remove-doc-btn" data-filename="${file}" style="padding:4px 8px;background:none;border:none;color:var(--text-light);cursor:pointer;font-size:18px;line-height:1;opacity:0.6;transition:opacity 0.2s;flex-shrink:0;" title="Rimuovi documento">×</button>
                 </div>
             `).join('');
-            details.innerHTML = `<div style="grid-column: 1 / -1; display:flex;flex-direction:column;gap:4px;">${filesList}</div>`;
+            details.innerHTML = `
+                <div style="grid-column: 1 / -1; display:flex;flex-direction:column;gap:4px;">${filesList}</div>
+            `;
+            
+            // Event listeners per i pulsanti di rimozione
+            details.querySelectorAll('.remove-doc-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const filename = e.target.getAttribute('data-filename');
+                    await deleteCollectionFile(commessa, collection.name, filename);
+                });
+            });
         } else {
-            details.innerHTML = '<div class="collection-files-empty" style="grid-column: 1 / -1;">Nessun file trovato per questo notebook.</div>';
+            details.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align:center;padding:40px 20px;color:var(--text-light);">Nessun file trovato per questo notebook.</div>
+            `;
         }
     } catch (error) {
         console.error('Error loading collection files:', error);
         details.innerHTML = '<div class="collection-files-error" style="grid-column: 1 / -1;">Errore nel caricamento dei file.</div>';
     }
+}
+
+async function deleteCollectionFile(commessa, collectionName, filename) {
+    try {
+        const response = await fetch('/api/delete-collection-file/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                commessa: commessa,
+                collection: collectionName,
+                filename: filename
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error('Error deleting file:', data.error);
+            alert(`Errore: ${data.error || 'Impossibile eliminare il file'}`);
+            return;
+        }
+
+        console.log('File deleted successfully:', filename);
+        
+        // Mostra il banner di conferma
+        showDeleteConfirmationBanner(filename);
+        
+        // Ricarica i file della collection
+        const modal = document.getElementById('collectionModal');
+        if (modal && modal.classList.contains('open')) {
+            const collection = { displayName: document.getElementById('modalCollectionTitle').textContent.replace('Notebook: ', ''), name: collectionName };
+            await showCollectionDetails(collection, commessa);
+        }
+    } catch (error) {
+        console.error('Error deleting file:', error);
+        alert('Errore durante l\'eliminazione del file');
+    }
+}
+
+function showDeleteConfirmationBanner(filename) {
+    // Crea il banner
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: var(--send-bg);
+        color: var(--accent-color);
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 13px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        animation: slideInUp 0.3s ease-out;
+        max-width: 300px;
+        word-break: break-word;
+    `;
+    
+    // Estrai solo il nome del file
+    const filenameOnly = filename.split('/').pop().split('\\').pop();
+    banner.textContent = `✓ ${filenameOnly} eliminato`;
+    
+    document.body.appendChild(banner);
+    
+    // Rimuovi il banner dopo 1 secondo
+    setTimeout(() => {
+        banner.style.animation = 'slideOutDown 0.3s ease-in';
+        setTimeout(() => {
+            banner.remove();
+        }, 300);
+    }, 1000);
 }
 
 function autoResizeTextarea(textarea) {
@@ -1493,6 +1594,169 @@ function appendLoader() {
         window.scrollTo({ top: targetScroll, behavior: 'smooth' });
     }, 50);
 
+    return row;
+}
+
+async function generateSummary() {
+    if (!activeCollection) {
+        showAgentInactive();
+        return;
+    }
+    
+    const summaryBtn = document.getElementById('summaryBtn');
+    if (summaryBtn) {
+        summaryBtn.disabled = true;
+    }
+    
+    ensureChatVisible();
+    const loaderRow = appendLoader();
+    
+    try {
+        const response = await fetch('/api/generate-summary/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                commessa: activeCollection.commessa,
+                collection: activeCollection.collection
+            })
+        });
+        
+        if (loaderRow) {
+            if (loaderRow._timer) clearInterval(loaderRow._timer);
+            loaderRow.remove();
+        }
+        
+        if (response.ok && response.headers.get('content-type').includes('application/pdf')) {
+            // Il backend ha ritornato un PDF
+            const blob = await response.blob();
+            const collection_clean = activeCollection.collection.replace(/_/g, ' ');
+            const filename = `Report_commessa_${activeCollection.commessa}_notebook_${collection_clean}.pdf`;
+            
+            // Mostra il banner con il pulsante di download
+            appendSummaryDownloadBanner(filename, blob);
+        } else {
+            // Errore
+            const data = await response.json();
+            appendMessage('assistant', `Errore: ${data.error || 'Impossibile generare il riassunto'}`);
+        }
+    } catch (error) {
+        console.error('Error generating summary:', error);
+        if (loaderRow) {
+            if (loaderRow._timer) clearInterval(loaderRow._timer);
+            loaderRow.remove();
+        }
+        appendMessage('assistant', 'Errore nella generazione del riassunto.');
+    } finally {
+        if (summaryBtn) {
+            summaryBtn.disabled = false;
+        }
+    }
+}
+
+function appendSummaryDownloadBanner(filename, blob) {
+    const chatHistory = document.getElementById('chatHistory');
+    if (!chatHistory) return null;
+    
+    const row = document.createElement('div');
+    row.className = 'chat-row assistant';
+    
+    const banner = document.createElement('div');
+    banner.className = 'summary-banner';
+    banner.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 24px;
+        background-color: #faf8f6;
+        border-radius: 14px;
+        border: 1px solid #e8e0d8;
+        gap: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    `;
+    
+    // Icona PDF e nome file
+    const iconContainer = document.createElement('div');
+    iconContainer.style.cssText = 'display: flex; align-items: center; gap: 12px;';
+    iconContainer.innerHTML = `
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <line x1="10" y1="9" x2="8" y2="9"></line>
+        </svg>
+    `;
+    
+    const text = document.createElement('span');
+    text.style.cssText = 'font-size: 14px; font-weight: 600; color: var(--text-color);';
+    text.textContent = filename;
+    
+    iconContainer.appendChild(text);
+    banner.appendChild(iconContainer);
+    
+    // Pulsante download
+    const downloadBtn = document.createElement('button');
+    downloadBtn.className = 'summary-download-btn';
+    downloadBtn.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    `;
+    downloadBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Download</span>
+    `;
+    
+    downloadBtn.addEventListener('mouseenter', () => {
+        downloadBtn.style.backgroundColor = '#c25f3f';
+        downloadBtn.style.transform = 'translateY(-2px)';
+    });
+    
+    downloadBtn.addEventListener('mouseleave', () => {
+        downloadBtn.style.backgroundColor = 'var(--accent-color)';
+        downloadBtn.style.transform = 'translateY(0)';
+    });
+    
+    downloadBtn.addEventListener('click', () => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    });
+    
+    banner.appendChild(downloadBtn);
+    row.appendChild(banner);
+    chatHistory.appendChild(row);
+    
+    // Scroll to show the banner
+    setTimeout(() => {
+        const rect = row.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const targetScroll = scrollTop + rect.top - 40;
+        window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    }, 50);
+    
     return row;
 }
 

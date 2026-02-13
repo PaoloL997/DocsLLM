@@ -15,6 +15,8 @@ pyyaml = ">=6.0.3,<7.0.0"
 graphrag = { git = "git@github.com:PaoloL997/graphrag.git", rev = "main" }
 duckling = { git = "git@github.com:PaoloL997/duckling.git", rev = "feat/jobpeek" }
 pypdf = "^3.14.0"
+reportlab = "^4.0.0"
+markdown = "^3.7"
 
 [[tool.poetry.source]]
 name = "pytorch"

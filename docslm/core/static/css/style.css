@@ -1385,6 +1385,43 @@ html, body {
     gap: 12px;
 }
 
+/* Summary Button */
+.summary-button {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border: none;
+    background-color: var(--button-bg);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.summary-button:hover {
+    background-color: var(--button-hover);
+}
+
+.summary-button:focus {
+    outline: none;
+    color: var(--text-color);
+}
+
+.summary-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: var(--button-bg);
+}
+
+.summary-button:disabled:hover {
+    background-color: var(--button-bg);
+}
+
 .model-control {
     position: relative;
 }
@@ -1746,6 +1783,28 @@ html, body {
 .btn-send:hover {
     background-color: #f0c4b3;
     transform: translateY(-1px);
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutDown {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(100%);
+        opacity: 0;
+    }
 }
 
 /* Responsive Design */
