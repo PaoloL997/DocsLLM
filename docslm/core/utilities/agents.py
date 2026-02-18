@@ -28,7 +28,6 @@ def send_message(request):
         data = json.loads(request.body)
         message = data.get('message', '')
         username = request.session.get('username')
-
         active_agent = request.session.get('active_agent')
         if not active_agent:
             return JsonResponse({'error': 'Nessun agent attivo. Seleziona un notebook prima di inviare un messaggio.'}, status=400)
@@ -37,8 +36,9 @@ def send_message(request):
         agent = AGENT_INSTANCES.get(session_key)
         if not agent:
             return JsonResponse({'error': 'Agent non trovato in memoria. Riseleziona il notebook.'}, status=400)
-
-        final_state = agent.invoke(message, user_id=username)
+        instance_username = f"comm_{active_agent['commessa']}_{active_agent['collection']}_{username}" # For job/collection context memory isolation
+        print(f"[AGENT INVOKE] User: {instance_username}, Message: {message}")
+        final_state = agent.invoke(message, user_id=instance_username)
         context = final_state.get("context", [])
         response = final_state.get("response", "")
 
