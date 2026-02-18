@@ -1,0 +1,51 @@
+/* ================================================================
+   MAIN LAYOUT
+   ================================================================ */
+
+/* Layout Container */
+.layout {
+    display: flex;
+    height: 100dvh;
+    overflow: hidden;
+}
+
+/* Content Container */
+.container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 1144px;
+    margin: 0 auto;
+    padding: 0 40px 40px;
+}
+
+/* Main Content Area */
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 24px;
+    padding: 40px 24px 60px;
+}
+
+/* Greeting Section */
+.greeting-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 180px;
+}
+
+.greeting-icon {
+    font-size: 36px;
+    color: var(--accent-color);
+}
+
+.greeting-text {
+    font-size: 36px;
+    font-weight: 400;
+    letter-spacing: -0.6px;
+}

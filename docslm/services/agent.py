@@ -3,6 +3,7 @@ from graphrag.store.store import Store
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
+import time
 
 class Agent:
     MODES = {
@@ -63,11 +64,12 @@ class Agent:
         
         responses = {}
         for query in queries:
+            time.sleep(10)
             state = self.invoke(
                 query=query,
                 user_id=user_id
             )
-            response = state['response']
+            response = state['response']    
             responses[query] = response
         
         # Create output DataFrame

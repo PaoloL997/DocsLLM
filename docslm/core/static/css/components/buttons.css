@@ -1,0 +1,155 @@
+/* ================================================================
+   BUTTON COMPONENTS
+   ================================================================ */
+
+/* Control Buttons */
+.control-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.control-btn:hover {
+    border-color: var(--text-color);
+    color: var(--text-color);
+}
+
+/* Send Button */
+.btn-send {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    border: none;
+    background-color: var(--send-bg);
+    color: var(--accent-color);
+    cursor: pointer;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.btn-send[disabled], 
+.btn-send.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.btn-send:hover {
+    background-color: #f0c4b3;
+    transform: translateY(-1px);
+}
+
+/* Summary Button */
+.summary-button {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border: none;
+    background-color: var(--button-bg);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+}
+
+.summary-button:hover {
+    background-color: var(--button-hover);
+}
+
+.summary-button:focus {
+    outline: none;
+    color: var(--text-color);
+}
+
+.summary-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: var(--button-bg);
+}
+
+.summary-button:disabled:hover {
+    background-color: var(--button-bg);
+}
+
+/* Settings Button */
+.settings-button {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border: none;
+    background-color: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.2s ease;
+}
+
+.settings-button:hover {
+    color: var(--text-color);
+}
+
+.settings-button:focus {
+    outline: none;
+    color: var(--text-color);
+}
+
+.settings-button.active {
+    color: var(--text-color);
+}
+
+/* Report Upload Button */
+.report-upload-button {
+    background: linear-gradient(135deg, var(--accent-color) 0%, #c9655b 100%);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-shadow: 0 4px 15px rgba(212, 112, 77, 0.3);
+    letter-spacing: 0.2px;
+}
+
+.report-upload-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(212, 112, 77, 0.4);
+}
+
+.report-upload-button:active {
+    transform: translateY(-1px);
+}
+
+.report-upload-button svg {
+    width: 17px;
+    height: 17px;
+    transition: transform 0.3s ease;
+}
+
+.report-upload-button:hover svg {
+    transform: scale(1.1) rotate(5deg);
+}
