@@ -9,7 +9,7 @@ from graphrag.store.store import (
 )
 from langchain_core.documents import Document
 from pymilvus import Collection, MilvusException, connections, db, utility
-from .process import Process
+from .process import process_files
 
 class ManageDB:
     def __init__(self, config: str):
@@ -89,8 +89,7 @@ class ManageDB:
             # Process and add documents if files are provided
             if files:
                 print(f"Processing {len(files)} files...")
-                processor = Process()
-                docs = processor.process(files)
+                docs = process_files(files)
                 print(f"Processed {len(docs)} documents")
                 
                 # Add processed documents to the store

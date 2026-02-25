@@ -2038,26 +2038,22 @@ function openSourceModal(btnDef) {
     header.className = 'source-modal-header';
 
     const meta = btnDef.metadata || {};
-    const rawName = btnDef.name || meta.name || 'Fonte';
     const rawType = (btnDef.type || meta.type || '').toString().toLowerCase();
     const ps = (btnDef.page_start !== undefined && btnDef.page_start !== null) ? btnDef.page_start : meta.page_start;
     const pe = (btnDef.page_end !== undefined && btnDef.page_end !== null) ? btnDef.page_end : meta.page_end;
+    const namespace = meta.namespace || meta.name || btnDef.name || 'Fonte';
 
-    let headerTitle = rawName;
-    if (rawType === 'text') {
-        if (ps !== undefined && ps !== null) {
-            const s = String(ps);
-            const e = (pe !== undefined && pe !== null) ? String(pe) : null;
-            if (e && e === s) {
-                headerTitle += ` (pag. ${s})`;
-            } else if (e) {
-                headerTitle += ` (pag. ${s}-${e})`;
-            } else {
-                headerTitle += ` (pag. ${s})`;
-            }
+    let headerTitle = namespace;
+    if (ps !== undefined && ps !== null && String(ps) !== 'N/A') {
+        const s = String(ps);
+        const e = (pe !== undefined && pe !== null && String(pe) !== 'N/A') ? String(pe) : null;
+        if (e && e === s) {
+            headerTitle += ` — pag. ${s}`;
+        } else if (e) {
+            headerTitle += ` — pag. ${s}-${e}`;
+        } else {
+            headerTitle += ` — pag. ${s}`;
         }
-    } else if (rawType === 'draw' || rawType === 'image') {
-        // just the name (already set)
     }
 
     header.textContent = headerTitle;
