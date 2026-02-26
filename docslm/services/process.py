@@ -63,6 +63,6 @@ def process_files(paths: list):
                 page_content=c["page_content"],
                 metadata=c["metadata"]
             ))
-        input = result["content"]["input"]
+        input = Path(result["content"]["input"]).stem
         _artifacts(result["artifacts"], outdir=os.path.join("media", input))
     return out
