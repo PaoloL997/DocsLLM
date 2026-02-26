@@ -60,7 +60,9 @@ class ManageDB:
             embedding_model=self.config.get("embedding_model"),
         )
 
-        # Seed the collection with a placeholder document to trigger creation
+        """
+        TODO: placeholder non funziona più. Da capire cosa fare vedendo il vecchio codice di casedonedemo.
+        """
         placeholder = Document(
             page_content="__placeholder__",
             metadata={
