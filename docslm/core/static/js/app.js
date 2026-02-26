@@ -226,6 +226,8 @@ function setupEventListeners() {
                     if (greetingElement) {
                         greetingElement.textContent = `Benvenuto, ${data.name}`;
                     }
+                    // Disabilita il pulsante fino a cuando non viene selezionata una collezione
+                    disableSendButton();
                 }
             } catch (error) {
                 console.error('Login error:', error);
@@ -744,10 +746,22 @@ function hideAgentStatus() {
     if (inactive) inactive.style.display = 'none';
 }
 
+function isUserLoggedIn() {
+    const userInfo = document.getElementById('userInfo');
+    return userInfo && userInfo.style.display !== 'none';
+}
+
 function enableSendButton() {
     const sendBtn = document.getElementById('sendBtn');
     const summaryBtn = document.getElementById('summaryBtn');
     if (!sendBtn) return;
+    
+    // Abilita solo se loggato E con collezione attiva
+    if (!isUserLoggedIn() || !activeCollection) {
+        disableSendButton();
+        return;
+    }
+    
     sendBtn.removeAttribute('disabled');
     sendBtn.classList.remove('disabled');
     if (summaryBtn) {
