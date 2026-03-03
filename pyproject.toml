@@ -7,13 +7,12 @@ readme = "README.md"
 packages = [{ include = "docslm" }]
 
 [tool.poetry.dependencies]
-python = ">=3.13,<3.14"
+python = ">=3.12,<3.14"
 django = ">=6.0.1,<7.0.0"
 openpyxl = ">=3.1.5,<4.0.0"
 pandas = ">=2.3.3,<3.0.0"
 pyyaml = ">=6.0.3,<7.0.0"
 graphrag = { git = "git@github.com:PaoloL997/graphrag.git", rev = "main" }
-duckling = { git = "git@github.com:PaoloL997/duckling.git", rev = "feat/jobpeek" }
 pypdf = "^3.14.0"
 reportlab = "^4.0.0"
 markdown = "^3.7"

@@ -16,6 +16,15 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://192.168.0.18:8080',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
+]
+
+# Allow embedding in iframes for same origin (needed for PDF preview)
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
@@ -23,6 +32,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'core',
 ]
+
+# Disattiva COOP/COEP in sviluppo su HTTP
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = None
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -86,6 +99,9 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core', 'static'),
 ]
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 # Default primary key field type

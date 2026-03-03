@@ -20,10 +20,10 @@ def check_path(request):
     PdfReader = None
     PdfWriter = None
     try:
-        from PyPDF2 import PdfReader, PdfWriter  # type: ignore
+        from pypdf import PdfReader, PdfWriter  # type: ignore
     except Exception:
         try:
-            from pypdf import PdfReader, PdfWriter  # type: ignore
+            from PyPDF2 import PdfReader, PdfWriter  # type: ignore
         except Exception:
             PdfReader = None
             PdfWriter = None
@@ -35,9 +35,18 @@ def check_path(request):
         if not path:
             return JsonResponse({'error': 'Path mancante'}, status=400)
 
+        # Normalize to absolute path if relative is provided
+        if not os.path.isabs(path):
+            candidate = os.path.join(settings.BASE_DIR, path)
+            if os.path.exists(candidate):
+                path = candidate
+
+        print(f"[check_path] requested path={path} type={file_type}")
+
         exists = os.path.exists(path)
         resp = {'exists': exists, 'path': path}
         if not exists:
+            print(f"[check_path] path does not exist")
             return JsonResponse(resp)
 
         if os.path.isdir(path):
@@ -47,8 +56,10 @@ def check_path(request):
                     full = os.path.join(path, name)
                     items.append({'name': name, 'is_dir': os.path.isdir(full)})
                 resp.update({'is_dir': True, 'listing': items})
+                print(f"[check_path] directory listing count={len(items)}")
                 return JsonResponse(resp)
             except Exception as e:
+                print(f"[check_path] directory error: {e}")
                 resp.update({'error': str(e)})
                 return JsonResponse(resp, status=500)
 
@@ -61,11 +72,21 @@ def check_path(request):
 
         if resp.get('size') and resp['size'] > MAX_PREVIEW_BYTES:
             resp['error'] = 'File troppo grande per anteprima'
+            print(f"[check_path] file too large size={resp['size']}")
             return JsonResponse(resp)
 
         mimetypes.init()
         mime, _ = mimetypes.guess_type(path)
         resp['mimetype'] = mime
+        print(f"[check_path] file mime={mime} size={resp['size']}")
+
+        # If file is under MEDIA_ROOT, expose an HTTP URL for browsers on other hosts
+        media_root_abs = os.path.abspath(settings.MEDIA_ROOT)
+        path_abs = os.path.abspath(path)
+        if media_root_abs and path_abs.startswith(media_root_abs):
+            rel_media = os.path.relpath(path_abs, media_root_abs).replace(os.sep, '/')
+            resp['url'] = request.build_absolute_uri(settings.MEDIA_URL + rel_media)
+            print(f"[check_path] media url={resp['url']}")
 
         # Images
         if mime and mime.startswith('image/'):
@@ -73,8 +94,10 @@ def check_path(request):
                 with open(path, 'rb') as fh:
                     b = fh.read()
                 resp['data_uri'] = f"data:{mime};base64," + base64.b64encode(b).decode('ascii')
+                print(f"[check_path] image preview bytes={len(b)}")
                 return JsonResponse(resp)
             except Exception as e:
+                print(f"[check_path] image error: {e}")
                 resp.update({'error': str(e)})
                 return JsonResponse(resp, status=500)
 
@@ -87,6 +110,10 @@ def check_path(request):
             if file_type == 'draw':
                 page_start = 1
                 page_end = 1
+            
+            # If only page_start is provided, default page_end to page_start (show single page)
+            if page_start is not None and page_end is None:
+                page_end = page_start
             
             # try extract pages if requested and library available
             if page_start is not None and page_end is not None and PdfReader and PdfWriter:
@@ -115,17 +142,20 @@ def check_path(request):
                         return JsonResponse(resp)
                     resp['pdf_data_uri'] = "data:application/pdf;base64," + base64.b64encode(out_bytes).decode('ascii')
                     resp['extracted_pages'] = {'page_start': ps, 'page_end': pe}
+                    print(f"[check_path] pdf extracted pages={ps}-{pe} bytes={len(out_bytes)}")
                     return JsonResponse(resp)
                 except Exception as e:
-                    resp.update({'error': 'Impossibile estrarre pagine: ' + str(e)})
-                    return JsonResponse(resp, status=500)
+                    print(f"[check_path] pdf extract error: {e}")
+                    # Fall through to full PDF as fallback
             # default: return full PDF
             try:
                 with open(path, 'rb') as fh:
                     b = fh.read()
                 resp['pdf_data_uri'] = "data:application/pdf;base64," + base64.b64encode(b).decode('ascii')
+                print(f"[check_path] pdf full bytes={len(b)}")
                 return JsonResponse(resp)
             except Exception as e:
+                print(f"[check_path] pdf read error: {e}")
                 resp.update({'error': str(e)})
                 return JsonResponse(resp, status=500)
 
@@ -138,16 +168,20 @@ def check_path(request):
                 with open(path, 'r', encoding='latin-1') as fh:
                     content = fh.read()
             except Exception as e:
+                print(f"[check_path] text latin-1 error: {e}")
                 resp.update({'error': f'Impossibile decodificare il file: {e}'})
                 return JsonResponse(resp, status=500)
         except Exception as e:
+            print(f"[check_path] text error: {e}")
             resp.update({'error': str(e)})
             return JsonResponse(resp, status=500)
 
         resp['preview'] = content
+        print(f"[check_path] text preview length={len(content)}")
         return JsonResponse(resp)
 
     except Exception as e:
+        print(f"[check_path] unexpected error: {e}")
         return JsonResponse({'error': str(e)}, status=500)
 
 

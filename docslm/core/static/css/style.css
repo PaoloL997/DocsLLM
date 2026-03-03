@@ -1768,20 +1768,22 @@ html, body {
     height: 36px;
     border-radius: 12px;
     border: none;
-    background-color: var(--send-bg);
-    color: var(--accent-color);
+    background-color: var(--accent-color);
+    color: #fff;
     cursor: pointer;
     transition: transform 0.2s, background-color 0.2s;
 }
 
 .btn-send[disabled], .btn-send.disabled {
+    background-color: var(--send-bg);
+    color: var(--accent-color);
     opacity: 0.5;
     cursor: not-allowed;
     pointer-events: none;
 }
 
 .btn-send:hover {
-    background-color: #f0c4b3;
+    background-color: #c05e3d;
     transform: translateY(-1px);
 }
 
@@ -2073,4 +2075,15 @@ html, body {
         align-items: flex-start;
         gap: 8px;
     }
+}
+
+@keyframes inputHighlight {
+    0%   { box-shadow: 0 0 0 3px rgba(212, 112, 77, 0.6); }
+    50%  { box-shadow: 0 0 0 5px rgba(212, 112, 77, 0.3); }
+    100% { box-shadow: 0 0 0 0px rgba(212, 112, 77, 0); }
+}
+
+.input-highlight {
+    animation: inputHighlight 1.5s ease-out;
+    outline: none;
 }
