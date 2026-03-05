@@ -1,12 +1,45 @@
 import os
 import io
+import re
 import json
 import base64
 import mimetypes
+import yaml
 from django.conf import settings
 from django.http import JsonResponse
 
+from services.store import ManageDB
+from graphrag.store.store import Store
+
 MAX_PREVIEW_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def _load_config() -> dict:
+    """Load and return the application YAML config.
+
+    Returns:
+        Parsed config dictionary.
+
+    Raises:
+        FileNotFoundError: If config.yaml does not exist.
+    """
+    config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+    if not os.path.exists(config_path):
+        raise FileNotFoundError('Configuration file not found')
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+
+def _connect_milvus(uri: str) -> None:
+    """Open a Milvus connection from a tcp:// URI.
+
+    Args:
+        uri: Milvus URI such as ``http://localhost:19530``.
+    """
+    from pymilvus import connections
+    host = uri.split('://')[1].split(':')[0]
+    port = int(uri.split(':')[-1])
+    connections.connect(host=host, port=port)
 
 
 def check_path(request):
@@ -193,12 +226,7 @@ def list_job_files(request):
         return JsonResponse({'error': 'Commessa richiesta'}, status=400)
 
     try:
-        import yaml
-        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
-        if not os.path.exists(config_path):
-            return JsonResponse({'error': 'Configuration file not found'}, status=500)
-        with open(config_path, 'r', encoding='utf-8') as f:
-            cfg = yaml.safe_load(f)
+        cfg = _load_config()
         jobs_base = cfg.get('jobs')
         if not jobs_base:
             return JsonResponse({'error': 'Jobs path not configured'}, status=500)
@@ -250,20 +278,12 @@ def list_collections(request):
         return JsonResponse({'collections': []})
 
     try:
-        import sys
-        import yaml
-        sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
-        from services.store import ManageDB
-
-        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
-        if not os.path.exists(config_path):
-            return JsonResponse({'error': 'Configuration file not found'}, status=500)
-
-        db_manager = ManageDB(config_path)
+        config = _load_config()
+        db_manager = ManageDB(os.path.join(settings.BASE_DIR, 'config.yaml'))
         try:
             collections = db_manager.list_collections(commessa)
-        except Exception as e:
-            if 'database not found' in str(e).lower():
+        except Exception as exc:
+            if 'database not found' in str(exc).lower():
                 db_manager.create_database(commessa)
                 collections = db_manager.list_collections(commessa)
             else:
@@ -272,12 +292,14 @@ def list_collections(request):
         formatted = [{
             'name': c,
             'displayName': c.replace('_', ' ').title(),
-            'commessa': commessa
+            'commessa': commessa,
         } for c in collections]
 
         return JsonResponse({'collections': formatted, 'commessa': commessa})
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    except FileNotFoundError as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
 
 
 def create_collection(request):
@@ -292,35 +314,26 @@ def create_collection(request):
         if not commessa or not collection_name:
             return JsonResponse({'error': 'Commessa and collection name are required'}, status=400)
 
-        parts = [part for part in collection_name.split() if part]
+        parts = [p for p in collection_name.split() if p]
         collection_name = '_'.join(parts)
         if not collection_name:
             return JsonResponse({'error': 'Collection name is invalid'}, status=400)
-        
-        # Validate collection name - only letters, numbers, and underscores allowed
-        import re
+
         if not re.match(r'^[a-zA-Z0-9_]+$', collection_name):
-            return JsonResponse({'error': 'Il nome della collection può contenere solo lettere, numeri e underscore. Caratteri non consentiti: &, !, @, #, etc.'}, status=400)
+            return JsonResponse(
+                {'error': 'Il nome della collection può contenere solo lettere, numeri e underscore.'},
+                status=400,
+            )
 
-        import sys
-        import yaml
-        sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
-        from services.store import ManageDB
-
-        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
-        if not os.path.exists(config_path):
-            return JsonResponse({'error': 'Configuration file not found'}, status=500)
-
+        config = _load_config()
         selected_files = data.get('files', []) if isinstance(data, dict) else []
         full_paths = []
         if selected_files:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f)
             jobs_base = config.get('jobs', '')
             for rel_path in selected_files:
                 full_paths.append(os.path.join(jobs_base, commessa, rel_path))
 
-        db_manager = ManageDB(config_path)
+        db_manager = ManageDB(os.path.join(settings.BASE_DIR, 'config.yaml'))
         db_manager.create_collection(commessa, collection_name, files=full_paths)
 
         return JsonResponse({
@@ -328,13 +341,14 @@ def create_collection(request):
             'message': f'Collection {collection_name} created successfully',
             'commessa': commessa,
             'collection_name': collection_name,
-            'selected_files': full_paths
+            'selected_files': full_paths,
         })
-    except Exception as e:
+    except FileNotFoundError as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+    except Exception as exc:
         import traceback
         traceback.print_exc()
-        error_msg = str(e)
-        # Extract user-friendly message from Milvus error
+        error_msg = str(exc)
         if 'Invalid collection name' in error_msg:
             error_msg = 'Il nome della collection contiene caratteri non consentiti. Usa solo lettere, numeri e underscore.'
         return JsonResponse({'error': error_msg}, status=500)
@@ -348,50 +362,37 @@ def list_collection_files(request):
         return JsonResponse({'error': 'Commessa and collection name are required'}, status=400)
 
     try:
-        import yaml
-        from pymilvus import Collection, connections
-        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
-        if not os.path.exists(config_path):
-            return JsonResponse({'error': 'Configuration file not found'}, status=500)
-
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
+        from pymilvus import Collection, db
+        config = _load_config()
         uri = config.get('uri')
         if not uri:
             return JsonResponse({'error': 'URI not configured'}, status=500)
 
-        host = uri.split("://")[1].split(":")[0]
-        port = int(uri.split(":")[-1])
-        connections.connect(host=host, port=port)
-
-        db_name = f"comm_{commessa}"
-        from pymilvus import db
-        db.using_database(db_name)
+        _connect_milvus(uri)
+        db.using_database(f"comm_{commessa}")
 
         collection_obj = Collection(collection_name)
-        collection_info = collection_obj.describe()
-        custom_properties = collection_info.get("properties", {})
-
+        props = collection_obj.describe().get('properties', {})
         files_data = []
-        if "files" in custom_properties:
+        if 'files' in props:
             try:
-                files_data = json.loads(custom_properties["files"])
+                files_data = json.loads(props['files'])
             except Exception:
                 files_data = []
 
         return JsonResponse({
             'files': files_data,
             'commessa': commessa,
-            'collection': collection_name
+            'collection': collection_name,
         })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    except FileNotFoundError as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
 
 
 def delete_collection_file(request):
-    """DELETE a file from a collection.
-    POST JSON: { commessa, collection, filename }
-    """
+    """POST JSON: { commessa, collection, filename } — remove a file from a collection."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -404,89 +405,57 @@ def delete_collection_file(request):
         if not commessa or not collection_name or not filename:
             return JsonResponse({'error': 'Commessa, collection, and filename are required'}, status=400)
 
-        import yaml
-        from pymilvus import Collection, connections
-        
-        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
-        if not os.path.exists(config_path):
-            return JsonResponse({'error': 'Configuration file not found'}, status=500)
-
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-        
+        from pymilvus import Collection, db as milvus_db
+        config = _load_config()
         uri = config.get('uri')
         if not uri:
             return JsonResponse({'error': 'URI not configured'}, status=500)
 
-        # Connect to Milvus
-        host = uri.split("://")[1].split(":")[0]
-        port = int(uri.split(":")[-1])
-        connections.connect(host=host, port=port)
-
-        # Use the correct database name
+        _connect_milvus(uri)
         db_name = f"comm_{commessa}"
-        from pymilvus import db as milvus_db
         milvus_db.using_database(db_name)
 
-        # Get the collection
         collection_obj = Collection(collection_name)
-        collection_info = collection_obj.describe()
-        custom_properties = collection_info.get("properties", {})
-
-        # Get current files list
+        props = collection_obj.describe().get('properties', {})
         files_data = []
-        if "files" in custom_properties:
+        if 'files' in props:
             try:
-                files_data = json.loads(custom_properties["files"])
+                files_data = json.loads(props['files'])
             except Exception:
                 files_data = []
 
-        # Remove the file from the list
         files_data = [f for f in files_data if not f.endswith(filename)]
+        collection_obj.set_properties({'files': json.dumps(files_data)})
 
-        # Update the properties
-        collection_obj.set_properties({"files": json.dumps(files_data)})
-
-        # Extract namespace from filename (only the filename without path and extension)
-        filename_only = os.path.basename(filename)
-        namespace = os.path.splitext(filename_only)[0]
-        
-        # Delete documents with this namespace from the store
+        namespace = os.path.splitext(os.path.basename(filename))[0]
         try:
-            import sys
-            sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
-            from services.store import Store
-            
             store = Store(
                 uri=uri,
                 database=db_name,
                 collection=collection_name,
-                k=config.get("k", 4),
-                embedding_model=config.get("embedding_model"),
+                k=config.get('k', 4),
+                embedding_model=config.get('embedding_model'),
             )
-            
-            # Delete documents with matching namespace
             store.delete(namespace)
             print(f"Deleted documents with namespace: {namespace}")
-        except Exception as e:
-            print(f"Warning: Could not delete from store: {e}")
-            # Continue anyway - properties were updated
+        except Exception as exc:
+            print(f"Warning: Could not delete from store: {exc}")
 
         return JsonResponse({
             'success': True,
             'message': f'File {filename} deleted successfully',
             'commessa': commessa,
             'collection': collection_name,
-            'remaining_files': files_data
+            'remaining_files': files_data,
         })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    except FileNotFoundError as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
 
 
 def delete_collection(request):
-    """DELETE an entire collection (notebook).
-    POST JSON: { commessa, collection }
-    """
+    """POST JSON: { commessa, collection } — drop an entire collection."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -494,43 +463,26 @@ def delete_collection(request):
         data = json.loads(request.body)
         commessa = data.get('commessa', '').strip()
         collection_name = data.get('collection', '').strip()
-
         if not commessa or not collection_name:
             return JsonResponse({'error': 'Commessa and collection are required'}, status=400)
 
-        import yaml
-        from pymilvus import Collection, connections
-        
-        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
-        if not os.path.exists(config_path):
-            return JsonResponse({'error': 'Configuration file not found'}, status=500)
-
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-        
+        from pymilvus import Collection, db as milvus_db
+        config = _load_config()
         uri = config.get('uri')
         if not uri:
             return JsonResponse({'error': 'URI not configured'}, status=500)
 
-        # Connect to Milvus
-        host = uri.split("://")[1].split(":")[0]
-        port = int(uri.split(":")[-1])
-        connections.connect(host=host, port=port)
-
-        # Use the correct database name
-        db_name = f"comm_{commessa}"
-        from pymilvus import db as milvus_db
-        milvus_db.using_database(db_name)
-
-        # Drop the collection
-        collection_obj = Collection(collection_name)
-        collection_obj.drop()
+        _connect_milvus(uri)
+        milvus_db.using_database(f"comm_{commessa}")
+        Collection(collection_name).drop()
 
         return JsonResponse({
             'success': True,
             'message': f'Collection {collection_name} deleted successfully',
             'commessa': commessa,
-            'collection': collection_name
+            'collection': collection_name,
         })
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+    except FileNotFoundError as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=500)

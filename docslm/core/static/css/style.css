@@ -8,8 +8,9 @@
     --button-bg: #fff8f5;
     --button-hover: #ffe8dd;
     --accent-color: #d4704d;
+    --accent-vivid: #e05530;
     --card-shadow: 0 24px 70px rgba(36, 34, 31, 0.08);
-    --send-bg: #f6d8cc;
+    --send-bg: #f0d0c4;
 }
 
 * {
@@ -86,9 +87,13 @@ html, body {
 }
 
 .sidebar.closed .sidebar-footer {
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
+    display: none;
+}
+
+.sidebar.closed .sidebar-search-results {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .sidebar.closed .sidebar-avatar {
@@ -421,14 +426,15 @@ html, body {
     background-color: var(--secondary-color);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 8px 10px;
+    padding: 9px 12px;
     margin-bottom: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
     cursor: pointer;
     flex-shrink: 0;
+    user-select: none;
 }
 
 .collection-card:hover {
@@ -437,9 +443,9 @@ html, body {
 }
 
 .collection-card.selected {
-    border-color: var(--accent-color);
+    border-color: var(--accent-vivid);
     background-color: var(--button-hover);
-    box-shadow: 0 0 0 1px var(--accent-color);
+    box-shadow: 0 0 0 1.5px var(--accent-vivid);
 }
 
 .collection-name {
@@ -937,8 +943,9 @@ html, body {
     gap: 8px;
 }
 
+/* sidebar-nav is currently empty — don't let it steal space from the collections list */
 .sidebar-nav {
-    flex: 1;
+    flex: 0 0 auto;
 }
 
 .sidebar-link {
@@ -965,9 +972,7 @@ html, body {
     color: var(--text-color);
 }
 
-.sidebar-search {
-    margin-top: auto;
-}
+/* duplicate .sidebar-search rule removed — margin-top:auto was misplacing the search bar */
 
 .sidebar-search-input {
     width: 100%;
@@ -1003,14 +1008,21 @@ html, body {
 }
 
 .sidebar-login-btn {
-    padding: 6px;
-    background-color: var(--black, #1a1a1a);
+    padding: 8px;
+    background-color: #1a1a1a;
     color: white;
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-size: 12px;
     font-weight: 600;
+    font-family: inherit;
+    letter-spacing: 0.3px;
+    transition: background-color 0.2s ease;
+}
+
+.sidebar-login-btn:hover {
+    background-color: #2e2e2e;
 }
 
 .sidebar-user-info {
@@ -1028,7 +1040,8 @@ html, body {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding-top: 4px;
+    padding-top: 10px;
+    margin-top: 4px;
     border-top: 1px solid var(--border-color);
     min-height: 24px;
     flex-shrink: 0;
@@ -1764,27 +1777,35 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border-radius: 12px;
     border: none;
-    background-color: var(--accent-color);
+    background-color: var(--accent-vivid);
     color: #fff;
     cursor: pointer;
-    transition: transform 0.2s, background-color 0.2s;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+    box-shadow: 0 4px 14px rgba(224, 85, 48, 0.38);
 }
 
 .btn-send[disabled], .btn-send.disabled {
     background-color: var(--send-bg);
-    color: var(--accent-color);
-    opacity: 0.5;
+    color: #b07060;
+    opacity: 0.4;
     cursor: not-allowed;
     pointer-events: none;
+    box-shadow: none;
 }
 
-.btn-send:hover {
-    background-color: #c05e3d;
-    transform: translateY(-1px);
+.btn-send:not([disabled]):not(.disabled):hover {
+    background-color: #c84a22;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 22px rgba(200, 74, 34, 0.48);
+}
+
+.btn-send:not([disabled]):not(.disabled):active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(200, 74, 34, 0.3);
 }
 
 @keyframes slideInUp {

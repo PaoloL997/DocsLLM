@@ -1,14 +1,37 @@
 import os
 import json
+import uuid
+import time
+import traceback
+import tempfile
 import yaml
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
+
+from services.agent import Agent
+from graphrag.store.store import Store
 
 # In-memory agent store (per session). TODO: replace with Redis.
-AGENT_INSTANCES = {}
+AGENT_INSTANCES: dict = {}
 
-# In-memory report cache (token -> {file_buffer, filename, timestamp})
-REPORT_CACHE = {}
+# In-memory report cache (token -> {file_buffer, filename, timestamp, session_key})
+REPORT_CACHE: dict = {}
+
+
+def _load_config() -> dict:
+    """Load and return the YAML configuration.
+
+    Returns:
+        Parsed config dictionary.
+
+    Raises:
+        FileNotFoundError: If config.yaml is missing.
+    """
+    config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+    if not os.path.exists(config_path):
+        raise FileNotFoundError('Configuration file not found')
+    with open(config_path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
 
 
 def _idx_to_letters(i: int) -> str:
@@ -21,6 +44,7 @@ def _idx_to_letters(i: int) -> str:
 
 
 def send_message(request):
+    """POST JSON: { message } — invoke the active agent and return its response."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -29,19 +53,29 @@ def send_message(request):
         message = data.get('message', '')
         username = request.session.get('username')
         active_agent = request.session.get('active_agent')
+
         if not active_agent:
-            return JsonResponse({'error': 'Nessun agent attivo. Seleziona un notebook prima di inviare un messaggio.'}, status=400)
+            return JsonResponse(
+                {'error': 'Nessun agent attivo. Seleziona un notebook prima di inviare un messaggio.'},
+                status=400,
+            )
 
         session_key = request.session.session_key
         agent = AGENT_INSTANCES.get(session_key)
         if not agent:
-            return JsonResponse({'error': 'Agent non trovato in memoria. Riseleziona il notebook.'}, status=400)
-        instance_username = f"comm_{active_agent['commessa']}_{active_agent['collection']}_{username}" # For job/collection context memory isolation
-        print(f"[AGENT INVOKE] User: {instance_username}, Message: {message}")
-        final_state = agent.invoke(message, user_id=instance_username)
-        context = final_state.get("context", [])
-        response = final_state.get("response", "")
+            return JsonResponse(
+                {'error': 'Agent non trovato in memoria. Riseleziona il notebook.'},
+                status=400,
+            )
 
+        instance_username = (
+            f"comm_{active_agent['commessa']}_{active_agent['collection']}_{username}"
+        )
+        print(f"[AGENT INVOKE] User: {instance_username}, Message: {message}")
+
+        final_state = agent.invoke(message, user_id=instance_username)
+        context = final_state.get('context', [])
+        response = final_state.get('response', '')
         response_text = response.get('response', '') if isinstance(response, dict) else str(response)
         has_context = bool(context) and isinstance(context, (list, tuple)) and len(context) > 0
 
@@ -49,29 +83,27 @@ def send_message(request):
         if has_context:
             try:
                 for idx, doc in enumerate(context):
-                    meta = {}
-                    if isinstance(doc, dict):
-                        meta = doc.get('metadata', {}) if isinstance(doc.get('metadata', {}), dict) else {}
-                    else:
-                        meta = getattr(doc, 'metadata', {}) or {}
+                    meta = getattr(doc, 'metadata', {}) if not isinstance(doc, dict) else doc.get('metadata', {})
+                    meta = meta if isinstance(meta, dict) else {}
 
-                    doc_type = meta.get('type') or meta.get('doc_type') or (meta.get('mimetype') or '').split('/')[0] or 'text'
+                    doc_type = (
+                        meta.get('type')
+                        or meta.get('doc_type')
+                        or (meta.get('mimetype') or '').split('/')[0]
+                        or 'text'
+                    )
                     name = meta.get('name') or meta.get('source') or meta.get('filename') or 'unknown'
-                    page_start = meta.get('page_start')
-                    page_end = meta.get('page_end')
-                    label = _idx_to_letters(idx)
-
                     context_buttons.append({
-                        'label': label,
+                        'label': _idx_to_letters(idx),
                         'name': name,
                         'type': doc_type,
-                        'page_start': page_start,
-                        'page_end': page_end,
+                        'page_start': meta.get('page_start'),
+                        'page_end': meta.get('page_end'),
                         'index': idx,
-                        'metadata': meta
+                        'metadata': meta,
                     })
-            except Exception as e:
-                print(f"Error building context buttons: {e}")
+            except Exception as exc:
+                print(f"Error building context buttons: {exc}")
                 context_buttons = []
 
         return JsonResponse({
@@ -79,119 +111,100 @@ def send_message(request):
             'message': 'Message processed by agent',
             'response': response_text,
             'has_context': has_context,
-            'context_buttons': context_buttons
+            'context_buttons': context_buttons,
         })
 
-    except Exception as e:
-        import traceback
+    except Exception:
         traceback.print_exc()
-        return JsonResponse({'error': f"Errore durante l'invocazione dell'agent: {str(e)}"}, status=500)
+        return JsonResponse({'error': "Errore durante l'invocazione dell'agent."}, status=500)
 
 
 def generate_report(request):
+    """POST multipart: file (xlsx), commessa, collection — run batch queries and return xlsx."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-    
+
     try:
         if 'file' not in request.FILES:
             return JsonResponse({'error': 'File Excel richiesto'}, status=400)
-        
-        excel_file = request.FILES['file']
+
         commessa = request.POST.get('commessa', '').strip()
         collection = request.POST.get('collection', '').strip()
-        
         if not commessa or not collection:
             return JsonResponse({'error': 'Commessa e collection richiesti'}, status=400)
-        
+
         session_key = request.session.session_key
         agent = AGENT_INSTANCES.get(session_key)
-        
         if not agent:
             return JsonResponse({'error': 'Agent non trovato'}, status=400)
-        
-        # Get user_id from session
-        user_id = request.session.get('username', None)
-        
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_file:
-            for chunk in excel_file.chunks():
-                tmp_file.write(chunk)
-            tmp_file_path = tmp_file.name
-        
-        result = agent.report(tmp_file_path, user_id=user_id)
-        
-        os.remove(tmp_file_path)
-        
-        # Store the report in cache with a token
-        import uuid
-        import time
+
+        user_id = request.session.get('username')
+
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+            for chunk in request.FILES['file'].chunks():
+                tmp.write(chunk)
+            tmp_path = tmp.name
+
+        try:
+            result = agent.report(tmp_path, user_id=user_id)
+        finally:
+            os.remove(tmp_path)
+
         token = str(uuid.uuid4())
         REPORT_CACHE[token] = {
             'file_buffer': result['file_buffer'],
             'filename': result['filename'],
             'timestamp': time.time(),
-            'session_key': session_key
+            'session_key': session_key,
         }
-        
+
         return JsonResponse({
             'success': True,
-            'message': f'Report elaborato con successo',
+            'message': 'Report elaborato con successo',
             'commessa': commessa,
             'collection': collection,
             'filename': result.get('filename'),
             'download_token': token,
-            'query_count': result.get('query_count')
+            'query_count': result.get('query_count'),
         })
-    
-    except Exception as e:
-        import traceback
+
+    except Exception:
         traceback.print_exc()
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': 'Errore durante la generazione del report.'}, status=500)
 
 
 def download_report(request):
-    """Serve a report file from cache using token"""
+    """GET ?token=… — stream a cached report file."""
     if request.method != 'GET':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-    
+
     try:
         token = request.GET.get('token', '')
-        filename = request.GET.get('filename', '')
-        
         if not token or token not in REPORT_CACHE:
-            return JsonResponse({'error': 'Report not found or expired'}, status=404)
-        
+            return JsonResponse({'error': 'Report non trovato o scaduto'}, status=404)
+
         report_data = REPORT_CACHE[token]
-        
-        # Optional: verify session security
-        session_key = request.session.session_key
-        if report_data.get('session_key') != session_key:
-            return JsonResponse({'error': 'Unauthorized'}, status=403)
-        
-        # Get file buffer and reset position
+        if report_data.get('session_key') != request.session.session_key:
+            return JsonResponse({'error': 'Non autorizzato'}, status=403)
+
         file_buffer = report_data['file_buffer']
         file_buffer.seek(0)
-        
-        # Stream the file
-        from django.http import FileResponse
+        del REPORT_CACHE[token]
+
         response = FileResponse(
             file_buffer,
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         )
         response['Content-Disposition'] = f'attachment; filename="{report_data["filename"]}"'
-        
-        # Clean up cache entry after download
-        del REPORT_CACHE[token]
-        
         return response
-        
-    except Exception as e:
-        import traceback
+
+    except Exception:
         traceback.print_exc()
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': 'Errore durante il download del report.'}, status=500)
 
 
 def initialize_agent(request):
+    """POST JSON: { commessa, collection_name, mode } — build and cache an Agent."""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -204,70 +217,50 @@ def initialize_agent(request):
         if not commessa or not collection_name:
             return JsonResponse({'error': 'Commessa and collection name are required'}, status=400)
 
-        # local import to avoid heavy imports at module load
-        import sys
-        sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
-        from services.agent import Agent
-        from graphrag.store.store import Store
-        import yaml
-
-        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
-        if not os.path.exists(config_path):
-            return JsonResponse({'error': 'Configuration file not found'}, status=500)
-
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-
+        config = _load_config()
         db_name = f"comm_{commessa}"
-        
-        # Get k value based on mode
-        default_k = 4
-        if mode in ['veloce', 'ragionamento']:
-            from services.agent import Agent as AgentClass
-            mode_config = AgentClass.MODES.get(mode, {})
-            k_value = mode_config.get('k', default_k)
-        else:
-            k_value = default_k
-        
-        print(f"[AGENT INIT] Initializing agent with K={k_value}, commessa={commessa}, collection={collection_name}, mode={mode}")
-        
+
+        mode_config = Agent.MODES.get(mode, {})
+        k_value = mode_config.get('k', config.get('k', 4))
+
+        print(f"[AGENT INIT] K={k_value}, commessa={commessa}, collection={collection_name}, mode={mode}")
+
         store = Store(
-            uri=config.get('uri'),
+            uri=config['uri'],
             database=db_name,
             collection=collection_name,
             k=k_value,
-            embedding_model=config.get('embedding_model')
+            embedding_model=config.get('embedding_model'),
         )
 
         agent = Agent(store=store, mode=mode, rerank=True)
 
-        session_key = request.session.session_key
-        if not session_key:
+        if not request.session.session_key:
             request.session.create()
-            session_key = request.session.session_key
-
+        session_key = request.session.session_key
         AGENT_INSTANCES[session_key] = agent
 
         request.session['active_agent'] = {
             'commessa': commessa,
             'collection': collection_name,
             'mode': mode,
-            'model': getattr(agent, 'model', None),
-            'draw_thinking_level': getattr(agent, 'draw_thinking_level', None)
+            'model': agent.model,
+            'draw_thinking_level': agent.draw_thinking_level,
         }
         request.session.modified = True
-        
+
         return JsonResponse({
             'success': True,
             'message': 'Agent initialized successfully',
             'commessa': commessa,
             'collection': collection_name,
             'mode': mode,
-            'model': getattr(agent, 'model', None),
-            'draw_thinking_level': getattr(agent, 'draw_thinking_level', None)
+            'model': agent.model,
+            'draw_thinking_level': agent.draw_thinking_level,
         })
 
-    except Exception as e:
-        import traceback
+    except FileNotFoundError as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+    except Exception:
         traceback.print_exc()
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'error': "Errore durante l'inizializzazione dell'agent."}, status=500)

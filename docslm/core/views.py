@@ -1,5 +1,5 @@
 from .utilities.auth import index, user_login, get_greeting
-from .utilities.agents import send_message, initialize_agent, generate_report, download_report, AGENT_INSTANCES
+from .utilities.agents import send_message, initialize_agent, generate_report, download_report
 from .utilities.files import (
     check_path,
     list_job_files,
@@ -19,7 +19,6 @@ __all__ = [
     "initialize_agent",
     "generate_report",
     "download_report",
-    "AGENT_INSTANCES",
     "check_path",
     "list_job_files",
     "list_collection_files",

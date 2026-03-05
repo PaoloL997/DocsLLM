@@ -4,98 +4,89 @@ import pandas as pd
 from datetime import datetime
 from io import BytesIO
 
+
 class Agent:
-    MODES = {
+    """Thin wrapper around GraphRAG that supports single-query and batch (report) modes."""
+
+    MODES: dict[str, dict] = {
         'veloce': {
             'model': 'gpt-4.1-mini',
             'draw_thinking_level': 'low',
-            'k': 4
+            'k': 4,
         },
         'ragionamento': {
             'model': 'gpt-5-mini',
             'draw_thinking_level': 'low',
-            'k': 10
-        }
+            'k': 10,
+        },
     }
-    
+
     def __init__(
-            self,
-            store: Store,
-            mode: str = "veloce",
-            model: str = None,
-            rerank: bool = True,
-            draw_thinking_level: str = None,
-            draw_model: str = "gemini-3-flash-preview",
-            ):
-        # Se viene specificata una modalità, usa le sue configurazioni
-        if mode in self.MODES:
-            mode_config = self.MODES[mode]
-            if model is None:
-                model = mode_config['model']
-            if draw_thinking_level is None:
-                draw_thinking_level = mode_config['draw_thinking_level']
-        else:
-            # Fallback ai valori di default se modalità non riconosciuta
-            if model is None:
-                model = "gpt-4.1-nano"
-            if draw_thinking_level is None:
-                draw_thinking_level = "low"
-        
+        self,
+        store: Store,
+        mode: str = 'veloce',
+        model: str | None = None,
+        rerank: bool = True,
+        draw_thinking_level: str | None = None,
+        draw_model: str = 'gemini-3-flash-preview',
+    ) -> None:
+        """Args:
+            store: Initialised Store instance.
+            mode: One of the keys in ``MODES`` ('veloce', 'ragionamento').
+            model: Override the LLM model for this mode.
+            rerank: Whether to enable document re-ranking.
+            draw_thinking_level: Override drawing-pipeline thinking level.
+            draw_model: Model used for drawing/image descriptions.
+        """
+        mode_cfg = self.MODES.get(mode, {})
         self.mode = mode
-        self.model = model
-        self.draw_thinking_level = draw_thinking_level
-        
+        self.model = model or mode_cfg.get('model', 'gpt-4.1-nano')
+        self.draw_thinking_level = draw_thinking_level or mode_cfg.get('draw_thinking_level', 'low')
+
         self.agent = GraphRAG(
             store=store,
-            llm=model,
+            llm=self.model,
             rerank=rerank,
-            draw_thinking_level=draw_thinking_level,
+            draw_thinking_level=self.draw_thinking_level,
             draw_model=draw_model,
         )
     
-    def invoke(self, query: str, user_id: str | None = None) -> str:
+    def invoke(self, query: str, user_id: str | None = None) -> dict:
+        """Run a single query through the agent graph.
+
+        Args:
+            query: User question.
+            user_id: Optional identifier used for per-user memory isolation.
+
+        Returns:
+            Graph state dict containing at least ``response`` and ``context``.
+        """
         return self.agent.run(query, user_id)
 
     def report(self, path: str, user_id: str | None = None) -> dict:
-        """Process Excel file with queries and generate report in memory"""
-        data = pd.read_excel(path)
-        queries = data['queries'].tolist()
-        
-        responses = {}
-        for query in queries:
-            state = self.invoke(
-                query=query,
-                user_id=user_id
-            )
-            response = state['response']
-            responses[query] = response
-        
-        # Create output DataFrame
-        out = pd.DataFrame({
-            'query': list(responses.keys()),
-            'response': list(responses.values())
-        })
-        
-        # Generate filename with timestamp
+        """Process an Excel file with a ``queries`` column and return a report.
+
+        Args:
+            path: Path to the Excel file.
+            user_id: Optional user identifier forwarded to ``invoke``.
+
+        Returns:
+            Dict with ``file_buffer`` (BytesIO), ``filename`` (str), and
+            ``query_count`` (int).
+        """
+        queries = pd.read_excel(path)['queries'].tolist()
+
+        responses = {q: self.invoke(q, user_id=user_id).get('response', '') for q in queries}
+
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        output_filename = f'report_{timestamp}.xlsx'
-        
-        # Save to BytesIO instead of disk
-        excel_buffer = BytesIO()
-        out.to_excel(excel_buffer, index=False, engine='openpyxl')
-        excel_buffer.seek(0)
-        
+        buf = BytesIO()
+        pd.DataFrame({'query': list(responses), 'response': list(responses.values())}).to_excel(
+            buf, index=False, engine='openpyxl'
+        )
+        buf.seek(0)
+
         return {
-            'query': 'Generate report',
-            'refined_query': 'Generate report',
-            'response': f'Report generato da {len(queries)} queries.',
-            'context': None,
-            'user_id': user_id,
-            'file_buffer': excel_buffer,
-            'filename': output_filename,
-            'query_count': len(queries)
+            'file_buffer': buf,
+            'filename': f'report_{timestamp}.xlsx',
+            'query_count': len(queries),
         }
-
-    
-
-        

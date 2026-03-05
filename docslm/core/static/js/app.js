@@ -38,7 +38,7 @@ async function loadGreeting() {
 }
 
 async function generateSummary() {
-    if (!activeCollection) {
+    if (!isLoggedIn || !activeCollection) {
         showAgentInactive();
         return;
     }
@@ -111,9 +111,7 @@ async function handleReportFileUpload(event) {
         }
         appendMessage('assistant', `Errore: ${error.message}`);
     } finally {
-        if (summaryBtn) {
-            summaryBtn.disabled = false;
-        }
+        enableSendButton();
     }
 }
 
@@ -227,6 +225,7 @@ function setupEventListeners() {
                     if (greetingElement) {
                         greetingElement.textContent = `Benvenuto, ${data.name}`;
                     }
+                    enableSendButton();
                 }
             } catch (error) {
                 console.error('Login error:', error);
@@ -748,14 +747,18 @@ function hideAgentStatus() {
 }
 
 function enableSendButton() {
-    if (!isLoggedIn) return;
     const sendBtn = document.getElementById('sendBtn');
     const summaryBtn = document.getElementById('summaryBtn');
     if (!sendBtn) return;
-    sendBtn.removeAttribute('disabled');
-    sendBtn.classList.remove('disabled');
-    if (summaryBtn) {
-        summaryBtn.disabled = false;
+    const canSend = isLoggedIn && !!activeCollection;
+    if (canSend) {
+        sendBtn.removeAttribute('disabled');
+        sendBtn.classList.remove('disabled');
+        if (summaryBtn) summaryBtn.disabled = false;
+    } else {
+        sendBtn.setAttribute('disabled', 'true');
+        sendBtn.classList.add('disabled');
+        if (summaryBtn) summaryBtn.disabled = true;
     }
 }
 
@@ -765,9 +768,7 @@ function disableSendButton() {
     if (!sendBtn) return;
     sendBtn.setAttribute('disabled', 'true');
     sendBtn.classList.add('disabled');
-    if (summaryBtn) {
-        summaryBtn.disabled = true;
-    }
+    if (summaryBtn) summaryBtn.disabled = true;
 }
 
 async function initializeAgent(commessa, collectionName) {
