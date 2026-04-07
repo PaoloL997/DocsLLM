@@ -16,6 +16,7 @@ graphrag = { git = "git@github.com:PaoloL997/graphrag.git", rev = "main" }
 pypdf = "^3.14.0"
 reportlab = "^4.0.0"
 markdown = "^3.7"
+duckling = {git = "https://github.com/PaoloL997/duckling.git", rev = "feat/docling-serve"}
 
 [[tool.poetry.source]]
 name = "pytorch"
