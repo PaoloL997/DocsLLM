@@ -2820,45 +2820,6 @@ function showJobDetails(job) {
     modal.classList.add('open');
 }
 
-async function showCollectionDetails(collection, commessa) {
-    const modal = document.getElementById('collectionModal');
-    const title = document.getElementById('modalCollectionTitle');
-    const details = document.getElementById('modalCollectionDetails');
-    if (!modal || !title || !details) return;
-    title.textContent = `Notebook: ${collection.displayName}`;
-    
-    // Mostra caricamento (span across both columns)
-    details.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: var(--text-light);">Caricamento file...</div>';
-    modal.classList.add('open');
-    
-    try {
-        const response = await fetch(`/api/list-collection-files/?commessa=${encodeURIComponent(commessa)}&collection=${encodeURIComponent(collection.name)}`);
-        const data = await response.json();
-        
-        if (data.files && data.files.length > 0) {
-            const filesList = data.files.map(file => `
-                <div class="jobfile-row jobfile-file" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border-color);border-radius:6px;background:var(--secondary-color);transition:all 0.2s;">
-                    <div style="display:flex;align-items:center;gap:10px;flex:1;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-light)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14,2 14,8 20,8"></polyline>
-                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                        </svg>
-                        <span style="font-size:14px;color:var(--text-color);word-break:break-all;">${file}</span>
-                    </div>
-                </div>
-            `).join('');
-            details.innerHTML = `<div style="grid-column: 1 / -1; display:flex;flex-direction:column;gap:4px;">${filesList}</div>`;
-        } else {
-            details.innerHTML = '<div class="collection-files-empty" style="grid-column: 1 / -1;">Nessun file trovato per questo notebook.</div>';
-        }
-    } catch (error) {
-        console.error('Error loading collection files:', error);
-        details.innerHTML = '<div class="collection-files-error" style="grid-column: 1 / -1;">Errore nel caricamento dei file.</div>';
-    }
-}
-
 function autoResizeTextarea(textarea) {
     if (!textarea) return;
     textarea.style.height = 'auto';

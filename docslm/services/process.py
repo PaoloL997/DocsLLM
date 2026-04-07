@@ -8,8 +8,8 @@ import os
 from pathlib import Path
 from langchain_core.documents import Document
 
-load_dotenv()
-SERVICE_URL = os.getenv("GCLOUD_SERVICE_URL")
+load_dotenv(Path(__file__).resolve().parents[2] / '.env')
+SERVICE_URL = os.getenv("CLOUD_SERVICE_URL")
 
 
 def get_id_token() -> str:
