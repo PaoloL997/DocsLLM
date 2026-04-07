@@ -27,7 +27,7 @@ def send_message(request):
     try:
         data = json.loads(request.body)
         message = data.get('message', '')
-        username = request.session.get('username')
+        username = request.user.username
         active_agent = request.session.get('active_agent')
         if not active_agent:
             return JsonResponse({'error': 'Nessun agent attivo. Seleziona un notebook prima di inviare un messaggio.'}, status=400)
@@ -108,23 +108,19 @@ def generate_report(request):
         
         if not agent:
             return JsonResponse({'error': 'Agent non trovato'}, status=400)
-        
-        # Get user_id from session
-        user_id = request.session.get('username', None)
-        
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_file:
-            for chunk in excel_file.chunks():
-                tmp_file.write(chunk)
-            tmp_file_path = tmp_file.name
-        
-        result = agent.report(tmp_file_path, user_id=user_id)
-        
-        os.remove(tmp_file_path)
-        
-        # Store the report in cache with a token
-        import uuid
-        import time
+
+        user_id = request.user.username
+
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+            for chunk in request.FILES['file'].chunks():
+                tmp.write(chunk)
+            tmp_path = tmp.name
+
+        try:
+            result = agent.report(tmp_path, user_id=user_id)
+        finally:
+            os.remove(tmp_path)
+
         token = str(uuid.uuid4())
         REPORT_CACHE[token] = {
             'file_buffer': result['file_buffer'],

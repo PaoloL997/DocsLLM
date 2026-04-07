@@ -1,0 +1,106 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocsLLM — Accedi</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=2">
+</head>
+<body class="auth-body">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <span class="greeting-icon">✱</span>
+                <h1 class="auth-title">Benvenuto in DocsLLM</h1>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Accedi</button>
+                <button class="auth-tab" data-tab="register">Registrati</button>
+            </div>
+
+            <div class="auth-error" id="authError" style="display: none;"></div>
+
+            <!-- Login Form -->
+            <form class="auth-form" id="loginForm">
+                <input type="text" name="username" placeholder="Username" class="auth-input" required autocomplete="username">
+                <input type="password" name="password" placeholder="Password" class="auth-input" required autocomplete="current-password">
+                <button type="submit" class="auth-submit">Accedi</button>
+            </form>
+
+            <!-- Register Form -->
+            <form class="auth-form" id="registerForm" style="display: none;">
+                <input type="text" name="username" placeholder="Username" class="auth-input" required autocomplete="username">
+                <input type="email" name="email" placeholder="Email" class="auth-input" required autocomplete="email">
+                <input type="password" name="password" placeholder="Password" class="auth-input" required autocomplete="new-password">
+                <input type="text" name="job_title" placeholder="Ruolo (es. Project Manager)" class="auth-input" autocomplete="organization-title">
+                <button type="submit" class="auth-submit">Registrati</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const tabs = document.querySelectorAll('.auth-tab');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const errorEl = document.getElementById('authError');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                errorEl.style.display = 'none';
+                if (tab.dataset.tab === 'login') {
+                    loginForm.style.display = '';
+                    registerForm.style.display = 'none';
+                } else {
+                    loginForm.style.display = 'none';
+                    registerForm.style.display = '';
+                }
+            });
+        });
+
+        function showError(msg) {
+            errorEl.textContent = msg;
+            errorEl.style.display = 'block';
+        }
+
+        function getCookie(name) {
+            const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return v ? decodeURIComponent(v.pop()) : null;
+        }
+
+        async function submit(form, action) {
+            errorEl.style.display = 'none';
+            const fd = new FormData(form);
+            const body = { action };
+            for (const [k, v] of fd.entries()) body[k] = v;
+
+            try {
+                const res = await fetch('/login/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    window.location.href = data.redirect || '/';
+                } else {
+                    showError(data.error || 'Errore sconosciuto');
+                }
+            } catch {
+                showError('Errore di connessione');
+            }
+        }
+
+        loginForm.addEventListener('submit', (e) => { e.preventDefault(); submit(loginForm, 'login'); });
+        registerForm.addEventListener('submit', (e) => { e.preventDefault(); submit(registerForm, 'register'); });
+    })();
+    </script>
+</body>
+</html>

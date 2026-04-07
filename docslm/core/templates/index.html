@@ -39,30 +39,40 @@
                 </ul>
             </nav>
 
-            <div class="sidebar-footer" id="userContainer">
-                <!-- Mostrato se non loggato -->
-                <div id="loginForm" class="sidebar-login-form">
-                    <input type="text" id="usernameInput" placeholder="Username..." class="sidebar-login-input">
-                    <button id="loginBtn" class="sidebar-login-btn">Accedi</button>
-                </div>
-                
-                <!-- Mostrato se loggato (nascosto di default) -->
-                <div id="userInfo" class="sidebar-user-info" style="display: none;">
-                    <div class="sidebar-avatar" id="userAvatar">?</div>
+            <div class="sidebar-footer">
+                <div class="sidebar-user-info">
+                    <div class="sidebar-avatar">{{ user.username.0|upper }}</div>
                     <div class="sidebar-user">
-                        <span class="sidebar-user-name" id="userNameDisplay"></span>
-                        <span class="sidebar-user-plan" id="userRoleDisplay"></span>
+                        <span class="sidebar-user-name">{{ user.username }}</span>
+                        <span class="sidebar-user-plan">{{ user.profile.job_title|default:"—" }}</span>
                     </div>
+                    <button class="sidebar-menu-btn" id="userMenuBtn" aria-label="Menu utente">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <circle cx="12" cy="5" r="1.5"></circle>
+                            <circle cx="12" cy="12" r="1.5"></circle>
+                            <circle cx="12" cy="19" r="1.5"></circle>
+                        </svg>
+                    </button>
+                </div>
+                <div class="sidebar-user-menu" id="userMenu" style="display: none;">
+                    <button class="sidebar-user-menu-item" id="logoutBtn">Esci</button>
                 </div>
             </div>
         </aside>
 
         <div class="container">
+        <!-- Navigation -->
+        <nav class="top-nav">
+            <div class="nav-pills">
+                <a href="/" class="nav-pill active">Chiedi</a>
+                <a href="/ricerca/" class="nav-pill">Ricerca</a>
+            </div>
+        </nav>
         <!-- Main Content -->
         <main class="main">
             <div class="greeting-section">
                 <span class="greeting-icon">✱</span>
-                <h1 class="greeting-text" id="greeting">Accedi al tuo account</h1>
+                <h1 class="greeting-text" id="greeting">Benvenuto, {{ user.username }}</h1>
             </div>
 
             <div class="chat-history" id="chatHistory"></div>

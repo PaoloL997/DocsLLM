@@ -1,12 +1,12 @@
 // Get greeting on page load
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        loadGreeting();
         setupEventListeners();
         // disable send until an agent/collection is selected
         disableSendButton();
         initializeDropdown();
         restoreSelectedCommessa();
+        setupUserMenu();
         
         // Check for any blocking overlays
         setTimeout(() => {
@@ -30,12 +30,39 @@ function initializeDropdown() {
     }
 }
 
-async function loadGreeting() {
-    const greetingElement = document.getElementById('greeting');
-    if (greetingElement) {
-        greetingElement.textContent = 'Accedi al tuo account';
+async function loadGreeting() {}
+
+function setupUserMenu() {
+    const menuBtn = document.getElementById('userMenuBtn');
+    const menu = document.getElementById('userMenu');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (!menuBtn || !menu) return;
+
+    menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.style.display = menu.style.display === 'none' ? '' : 'none';
+    });
+
+    document.addEventListener('click', () => { menu.style.display = 'none'; });
+    menu.addEventListener('click', (e) => e.stopPropagation());
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await fetch('/logout/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                });
+                localStorage.removeItem('docslm_user');
+                window.location.href = '/login/';
+            } catch (err) {
+                console.error('Logout error:', err);
+            }
+        });
     }
 }
+
+async function restoreSession() {}
 
 async function generateSummary() {
     if (!activeCollection) {
@@ -137,8 +164,6 @@ function setupEventListeners() {
     const sidebarToggle = document.getElementById('sidebarToggle');
     const searchIconButton = document.getElementById('searchIconButton');
     const sidebarSearchInput = document.getElementById('sidebarSearchInput');
-    const loginBtn = document.getElementById('loginBtn');
-    const usernameInput = document.getElementById('usernameInput');
     const jobModal = document.getElementById('jobModal');
     const closeModal = document.getElementById('closeModal');
     const collectionModal = document.getElementById('collectionModal');
@@ -199,42 +224,6 @@ function setupEventListeners() {
                 clearTimeout(timeout);
                 performSearch(this.value, false);
             }
-        });
-    }
-
-    if (loginBtn && usernameInput) {
-        loginBtn.addEventListener('click', async function() {
-            const username = usernameInput.value.trim();
-            if (!username) return;
-            try {
-                const response = await fetch('/api/login/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({ username: username })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    document.getElementById('loginForm').style.display = 'none';
-                    document.getElementById('userInfo').style.display = 'flex';
-                    document.getElementById('userNameDisplay').textContent = data.name;
-                    document.getElementById('userRoleDisplay').textContent = data.role;
-                    document.getElementById('userAvatar').textContent = data.initial;
-                    const greetingElement = document.getElementById('greeting');
-                    if (greetingElement) {
-                        greetingElement.textContent = `Benvenuto, ${data.name}`;
-                    }
-                    // Disabilita il pulsante fino a cuando non viene selezionata una collezione
-                    disableSendButton();
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-            }
-        });
-        usernameInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') loginBtn.click();
         });
     }
 
@@ -690,12 +679,16 @@ let modalSelectedFiles = [];
 let activeCollection = null;
 // Flag to track if documents are being processed
 let isProcessing = false;
+// User is always authenticated on this page (protected by @login_required)
+let isLoggedIn = true;
 
 function showAgentLoading() {
-    const loading = document.querySelector('.agent-loading');
-    const success = document.querySelector('.agent-success');
-    const error = document.querySelector('.agent-error');
-    const inactive = document.querySelector('.agent-inactive');
+    const root = document.getElementById('agentStatus');
+    if (!root) return;
+    const loading = root.querySelector('.agent-loading');
+    const success = root.querySelector('.agent-success');
+    const error = root.querySelector('.agent-error');
+    const inactive = root.querySelector('.agent-inactive');
     if (loading) loading.style.display = 'flex';
     if (success) success.style.display = 'none';
     if (error) error.style.display = 'none';
@@ -703,10 +696,12 @@ function showAgentLoading() {
 }
 
 function showAgentSuccess() {
-    const loading = document.querySelector('.agent-loading');
-    const success = document.querySelector('.agent-success');
-    const error = document.querySelector('.agent-error');
-    const inactive = document.querySelector('.agent-inactive');
+    const root = document.getElementById('agentStatus');
+    if (!root) return;
+    const loading = root.querySelector('.agent-loading');
+    const success = root.querySelector('.agent-success');
+    const error = root.querySelector('.agent-error');
+    const inactive = root.querySelector('.agent-inactive');
     if (loading) loading.style.display = 'none';
     if (success) success.style.display = 'flex';
     if (error) error.style.display = 'none';
@@ -714,10 +709,12 @@ function showAgentSuccess() {
 }
 
 function showAgentError() {
-    const loading = document.querySelector('.agent-loading');
-    const success = document.querySelector('.agent-success');
-    const error = document.querySelector('.agent-error');
-    const inactive = document.querySelector('.agent-inactive');
+    const root = document.getElementById('agentStatus');
+    if (!root) return;
+    const loading = root.querySelector('.agent-loading');
+    const success = root.querySelector('.agent-success');
+    const error = root.querySelector('.agent-error');
+    const inactive = root.querySelector('.agent-inactive');
     if (loading) loading.style.display = 'none';
     if (success) success.style.display = 'none';
     if (error) error.style.display = 'flex';
@@ -725,10 +722,12 @@ function showAgentError() {
 }
 
 function showAgentInactive() {
-    const loading = document.querySelector('.agent-loading');
-    const success = document.querySelector('.agent-success');
-    const error = document.querySelector('.agent-error');
-    const inactive = document.querySelector('.agent-inactive');
+    const root = document.getElementById('agentStatus');
+    if (!root) return;
+    const loading = root.querySelector('.agent-loading');
+    const success = root.querySelector('.agent-success');
+    const error = root.querySelector('.agent-error');
+    const inactive = root.querySelector('.agent-inactive');
     if (loading) loading.style.display = 'none';
     if (success) success.style.display = 'none';
     if (error) error.style.display = 'none';
@@ -736,10 +735,12 @@ function showAgentInactive() {
 }
 
 function hideAgentStatus() {
-    const loading = document.querySelector('.agent-loading');
-    const success = document.querySelector('.agent-success');
-    const error = document.querySelector('.agent-error');
-    const inactive = document.querySelector('.agent-inactive');
+    const root = document.getElementById('agentStatus');
+    if (!root) return;
+    const loading = root.querySelector('.agent-loading');
+    const success = root.querySelector('.agent-success');
+    const error = root.querySelector('.agent-error');
+    const inactive = root.querySelector('.agent-inactive');
     if (loading) loading.style.display = 'none';
     if (success) success.style.display = 'none';
     if (error) error.style.display = 'none';
@@ -810,6 +811,10 @@ async function initializeAgent(commessa, collectionName) {
                 collection: collectionName,
                 mode: mode
             };
+            // Dispatch event for other pages (e.g. ricerca) to react
+            document.dispatchEvent(new CustomEvent('collectionSelected', {
+                detail: { commessa, collection: collectionName, mode }
+            }));
             // Show success message
             showAgentSuccess();
             // enable sending now that an agent is active

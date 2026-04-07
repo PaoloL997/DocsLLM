@@ -5,9 +5,10 @@ app_name = 'core'
 
 urlpatterns = [
     path('', views.index, name='index'),
-    path('api/greeting/', views.get_greeting, name='greeting'),
+    path('ricerca/', views.ricerca, name='ricerca'),
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
     path('api/send-message/', views.send_message, name='send_message'),
-    path('api/login/', views.user_login, name='login'),
     path('api/search-commesse/', views.search_commesse, name='search_commesse'),
     path('api/list-collections/', views.list_collections, name='list_collections'),
     path('api/list-job-files/', views.list_job_files, name='list_job_files'),
@@ -19,4 +20,6 @@ urlpatterns = [
     path('api/generate-report/', views.generate_report, name='generate_report'),
     path('api/download-report/', views.download_report, name='download_report'),
     path('api/check-path/', views.check_path, name='check_path'),
+    path('api/initialize-search-store/', views.initialize_search_store, name='initialize_search_store'),
+    path('api/search-documents/', views.search_documents, name='search_documents'),
 ]
