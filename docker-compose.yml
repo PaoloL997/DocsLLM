@@ -63,7 +63,7 @@ services:
 
   attu:
     container_name: milvus-attu
-    image: zilliz/attu:v2.4.0
+    image: zilliz/attu:v2.6.2
     environment:
       MILVUS_URL: milvus:19530
     ports:
@@ -89,6 +89,18 @@ services:
     networks:
       - milvus
 
+  docling-serve:
+    container_name: docling-serve
+    image: 0225760f12fb
+    environment:
+      - HF_HUB_OFFLINE=0
+    volumes:
+      - docling_models:/opt/app-root/src/.cache/docling/models
+    ports:
+      - "5001:5001"
+    networks:
+      - milvus
+
 networks:
   milvus:
     driver: bridge
@@ -98,3 +110,4 @@ volumes:
   minio_data:
   milvus_data:
   redis_data:
+  docling_models:
