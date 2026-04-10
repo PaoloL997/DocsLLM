@@ -171,31 +171,8 @@ function setupEventListeners() {
     const createCollectionModal = document.getElementById('createCollectionModal');
     const createCollectionConfirmBtn = document.getElementById('createCollectionConfirmBtn');
 
-    if (sidebar && sidebarToggle) {
-        sidebarToggle.addEventListener('click', function() {
-            const isClosed = sidebar.classList.toggle('closed');
-            sidebarToggle.setAttribute('aria-label', isClosed ? 'Apri sidebar' : 'Chiudi sidebar');
-            
-            // Animate chat card position during sidebar transition
-            const chatCard = document.querySelector('.chat-card.fixed');
-            if (chatCard && window.alignChatCardGlobal) {
-                const startTime = performance.now();
-                const duration = 200; // Match sidebar transition duration (0.2s = 200ms)
-                
-                function animatePosition(currentTime) {
-                    const elapsed = currentTime - startTime;
-                    
-                    // Keep updating position during transition
-                    window.alignChatCardGlobal();
-                    
-                    if (elapsed < duration) {
-                        requestAnimationFrame(animatePosition);
-                    }
-                }
-                
-                requestAnimationFrame(animatePosition);
-            }
-        });
+    if (sidebarToggle) {
+        sidebarToggle.style.display = 'none';
     }
 
     if (searchIconButton && sidebar && sidebarSearchInput) {
@@ -2362,24 +2339,33 @@ function renderCollections(collections, container, commessaCode) {
     const section = document.createElement('div');
     section.className = 'collections-section';
 
-    const createWrapper = document.createElement('div');
-    createWrapper.className = 'create-notebook-wrapper';
+    const isRicerca = window.location.pathname.includes('/ricerca');
 
-    const createBtn = document.createElement('div');
-    createBtn.className = 'create-notebook-btn';
-    createBtn.innerHTML = `
-        <span class="create-notebook-text">Crea nuovo Notebook</span>
-        <div class="plus-icon">+</div>
-    `;
-
-    createBtn.addEventListener('click', () => {
-        openCreateCollectionModal(commessaCode);
-    });
-
-    createWrapper.appendChild(createBtn);
+    if (!isRicerca) {
+        const createWrapper = document.createElement('div');
+        createWrapper.className = 'create-notebook-wrapper';
+        const createBtn = document.createElement('div');
+        createBtn.className = 'create-notebook-btn';
+        createBtn.innerHTML = `
+            <span class="create-notebook-text">Crea nuovo Notebook</span>
+            <div class="plus-icon">+</div>
+        `;
+        createBtn.addEventListener('click', () => {
+            openCreateCollectionModal(commessaCode);
+        });
+        createWrapper.appendChild(createBtn);
+        section.appendChild(createWrapper);
+    }
 
     const list = document.createElement('div');
     list.className = 'collections-list';
+
+    if (isRicerca && !collections.length) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'collections-empty-msg';
+        emptyMsg.textContent = 'Crea un Notebook nella sezione Chiedi';
+        section.appendChild(emptyMsg);
+    }
 
     collections.forEach((collection) => {
         const card = document.createElement('div');
@@ -2431,7 +2417,6 @@ function renderCollections(collections, container, commessaCode) {
         }
     });
 
-    section.appendChild(createWrapper);
     section.appendChild(list);
 
     container.appendChild(section);
@@ -2546,6 +2531,10 @@ async function initializeAgent(commessa, collectionName) {
                 mode: mode
             };
             console.log('Agent initialized successfully:', data);
+            // Dispatch event for other pages (e.g. ricerca) to react
+            document.dispatchEvent(new CustomEvent('collectionSelected', {
+                detail: { commessa, collection: collectionName, mode }
+            }));
             // Show success message
             showAgentSuccess();
             // enable sending now that an agent is active

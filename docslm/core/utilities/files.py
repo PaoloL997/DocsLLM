@@ -4,9 +4,14 @@ import re
 import json
 import base64
 import mimetypes
+import logging
+import threading
 import yaml
 from django.conf import settings
 from django.http import JsonResponse
+from duckling.service import CloudService
+
+logger = logging.getLogger(__name__)
 
 from services.store import ManageDB
 from graphrag.store.store import Store
@@ -224,6 +229,13 @@ def list_job_files(request):
     subpath = request.GET.get('subpath', '').strip()
     if not commessa:
         return JsonResponse({'error': 'Commessa richiesta'}, status=400)
+
+    if not subpath:
+        def _warmup():
+            logger.info('list_job_files: chiamata a CloudService().warmup()')
+            result = CloudService().warmup()
+            logger.info('list_job_files: CloudService().warmup() -> %s', result)
+        threading.Thread(target=_warmup, daemon=True).start()
 
     try:
         cfg = _load_config()

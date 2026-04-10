@@ -1048,7 +1048,7 @@ html, body {
     flex-direction: column;
     width: 100%;
     max-width: 1144px;
-    margin: 0;
+    margin: 0 auto;
     padding: 0 40px 40px;
 }
 
@@ -1826,6 +1826,14 @@ html, body {
 .ricerca-main {
     align-items: center;
     padding-top: 60px;
+}
+
+.ricerca-main.has-results {
+    justify-content: flex-start;
+}
+
+.ricerca-main.has-results .greeting-section {
+    display: none;
 }
 
 .ricerca-search-section {

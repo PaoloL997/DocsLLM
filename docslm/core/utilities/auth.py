@@ -72,7 +72,6 @@ def _handle_login(request, data: dict) -> JsonResponse:
         return JsonResponse({'error': 'Credenziali non valide'}, status=401)
 
     login(request, user)
-    _trigger_health_check()
     return JsonResponse({'success': True, 'redirect': '/'})
 
 
@@ -104,20 +103,4 @@ def _handle_register(request, data: dict) -> JsonResponse:
     UserProfile.objects.create(user=user, job_title=job_title)
 
     login(request, user)
-    _trigger_health_check()
     return JsonResponse({'success': True, 'redirect': '/'})
-
-
-def _trigger_health_check():
-    import threading
-    from services.process import health_check
-
-    def _run():
-        try:
-            print("[health_check] Sending request...")
-            result = health_check()
-            print(f"[health_check] OK — {result}")
-        except Exception as e:
-            print(f"[health_check] FAILED — {e}")
-
-    threading.Thread(target=_run, daemon=True).start()

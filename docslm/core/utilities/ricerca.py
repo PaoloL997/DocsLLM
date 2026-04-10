@@ -139,9 +139,14 @@ def _format_results(raw_results: list) -> list[dict]:
         raw_results: List of (Document, score) tuples from Store.retrieve.
 
     Returns:
-        List of dicts with content, metadata, and score.
+        List of dicts with content, metadata, and normalized score (0-100).
     """
     results = []
+    scores = [float(score) for _, score in raw_results]
+    max_score = max(scores) if scores else 1.0
+    min_score = min(scores) if scores else 0.0
+    score_range = max_score - min_score if max_score != min_score else 1.0
+
     for doc, score in raw_results:
         meta = getattr(doc, 'metadata', {})
         if not isinstance(meta, dict):
@@ -151,6 +156,8 @@ def _format_results(raw_results: list) -> list[dict]:
         if meta.get('namespace') == '__init__':
             continue
 
+        normalized = ((float(score) - min_score) / score_range) * 100
+
         results.append({
             'content': doc.page_content[:500],
             'name': meta.get('name', 'Documento'),
@@ -159,7 +166,7 @@ def _format_results(raw_results: list) -> list[dict]:
             'path': meta.get('path', ''),
             'page_start': meta.get('page_start'),
             'page_end': meta.get('page_end'),
-            'score': round(float(score), 4),
+            'score': round(normalized, 1),
             'metadata': meta,
         })
 

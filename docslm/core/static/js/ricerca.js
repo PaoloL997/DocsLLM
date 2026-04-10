@@ -118,6 +118,7 @@
             updateSearchButton();
 
             if (data.success && Array.isArray(data.results)) {
+                document.querySelector('.ricerca-main').classList.add('has-results');
                 renderResults(data.results);
             } else {
                 resultsContainer.innerHTML =
@@ -195,7 +196,7 @@
         if (score != null) {
             const scoreEl = document.createElement('span');
             scoreEl.className = 'ricerca-result-score';
-            scoreEl.textContent = `${(score * 100).toFixed(1)}%`;
+            scoreEl.textContent = `${score.toFixed(1)}%`;
             header.appendChild(scoreEl);
         }
 
