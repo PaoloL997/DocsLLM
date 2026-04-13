@@ -195,6 +195,15 @@ def check_path(request):
                 resp.update({'error': str(e)})
                 return JsonResponse(resp, status=500)
 
+        # Excel files: return download URL only
+        if path.lower().endswith(('.xlsx', '.xls', '.xlsm')):
+            if resp.get('url'):
+                resp['download_url'] = resp['url']
+                print(f"[check_path] excel download url={resp['url']}")
+                return JsonResponse(resp)
+            resp.update({'error': 'File Excel non disponibile per il download'})
+            return JsonResponse(resp, status=404)
+
         # Other files: try text decode
         try:
             with open(path, 'r', encoding='utf-8') as fh:

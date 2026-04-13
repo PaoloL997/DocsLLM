@@ -2089,7 +2089,7 @@ function openSourceModal(btnDef) {
             })
         }).then(r => r.json()).then(res => {
             loading.remove();
-            if (res && (res.preview !== undefined || res.pdf_data_uri || res.data_uri || res.listing)) {
+            if (res && (res.preview !== undefined || res.pdf_data_uri || res.data_uri || res.download_url || res.listing)) {
                 // If server returned a text preview, show it
                 if (res.preview !== undefined && res.preview !== null) {
                     const pre = document.createElement('pre');
@@ -2120,6 +2120,16 @@ function openSourceModal(btnDef) {
                     img.style.maxHeight = '60vh';
                     img.alt = 'Anteprima immagine';
                     content.appendChild(img);
+                }
+
+                // Excel: show download button
+                else if (res.download_url) {
+                    const a = document.createElement('a');
+                    a.href = res.download_url;
+                    a.download = '';
+                    a.className = 'excel-download-btn';
+                    a.textContent = '⬇ Scarica file Excel';
+                    content.appendChild(a);
                 }
 
                 // If directory listing
@@ -3586,7 +3596,7 @@ function openSourceModal(btnDef) {
             body: JSON.stringify({ path: pathVal, page_start: ps !== undefined ? ps : null, page_end: pe !== undefined ? pe : null })
         }).then(r => r.json()).then(res => {
             loading.remove();
-            if (res && (res.preview !== undefined || res.pdf_data_uri || res.data_uri || res.listing)) {
+            if (res && (res.preview !== undefined || res.pdf_data_uri || res.data_uri || res.download_url || res.listing)) {
                 // If server returned a text preview, show it
                 if (res.preview !== undefined && res.preview !== null) {
                     const pre = document.createElement('pre');
@@ -3617,6 +3627,16 @@ function openSourceModal(btnDef) {
                     img.style.maxHeight = '60vh';
                     img.alt = 'Anteprima immagine';
                     content.appendChild(img);
+                }
+
+                // Excel: show download button
+                else if (res.download_url) {
+                    const a = document.createElement('a');
+                    a.href = res.download_url;
+                    a.download = '';
+                    a.className = 'excel-download-btn';
+                    a.textContent = '⬇ Scarica file Excel';
+                    content.appendChild(a);
                 }
 
                 // If directory listing

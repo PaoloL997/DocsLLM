@@ -366,6 +366,18 @@ html, body {
     flex: 1 1 auto;
 }
 
+.excel-download-btn {
+    display: inline-block;
+    margin: 24px auto;
+    padding: 12px 28px;
+    background: var(--accent-color);
+    color: #fff;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 15px;
+}
+
 .field-value {
     font-weight: 600;
     color: var(--accent-color);

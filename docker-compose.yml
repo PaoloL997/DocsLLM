@@ -91,7 +91,7 @@ services:
 
   docling-serve:
     container_name: docling-serve
-    image: 0225760f12fb
+    image: quay.io/docling-project/docling-serve:latest
     environment:
       - HF_HUB_OFFLINE=0
     volumes:
