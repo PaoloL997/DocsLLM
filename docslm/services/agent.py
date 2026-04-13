@@ -10,12 +10,12 @@ class Agent:
 
     MODES: dict[str, dict] = {
         'veloce': {
-            'model': 'gpt-4.1-mini',
+            'model': 'gpt-5.4-nano',
             'draw_thinking_level': 'low',
-            'k': 4,
+            'k': 5,
         },
         'ragionamento': {
-            'model': 'gpt-5-mini',
+            'model': 'gpt-5.4-mini',
             'draw_thinking_level': 'low',
             'k': 10,
         },
