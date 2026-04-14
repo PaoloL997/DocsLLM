@@ -1,8 +1,14 @@
 from graphrag.graph.agent import GraphRAG
 from graphrag.store.store import Store
+from graphrag import PromptsConfig
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
+from .prompts import (
+    GENERATE_RESPONSE_PROMPT,
+    EVALUATE_CONTEXT_PROMPT,
+    REFINE_QUERY_PROMPT
+)
 
 
 class Agent:
@@ -42,9 +48,14 @@ class Agent:
         self.mode = mode
         self.model = model or mode_cfg.get('model', 'gpt-4.1-nano')
         self.draw_thinking_level = draw_thinking_level or mode_cfg.get('draw_thinking_level', 'low')
-
+        custom_prompts = PromptsConfig(
+            generate_response=GENERATE_RESPONSE_PROMPT,
+            evaluate_context=EVALUATE_CONTEXT_PROMPT,
+            refine_query=REFINE_QUERY_PROMPT,
+        )
         self.agent = GraphRAG(
             store=store,
+            prompts=custom_prompts,
             llm=self.model,
             rerank=rerank,
             draw_thinking_level=self.draw_thinking_level,

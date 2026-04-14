@@ -17,6 +17,9 @@ pypdf = "^3.14.0"
 reportlab = "^4.0.0"
 markdown = "^3.7"
 duckling = {git = "https://github.com/PaoloL997/duckling.git", rev = "feat/docling-serve"}
+djangorestframework = "^3.17.1"
+djangorestframework-simplejwt = "^5.5.1"
+django-cors-headers = "^4.9.0"
 
 [[tool.poetry.source]]
 name = "pytorch"
