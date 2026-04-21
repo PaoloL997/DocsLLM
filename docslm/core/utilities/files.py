@@ -284,12 +284,20 @@ def list_job_files(request):
 
 
 def list_collections(request):
-    """List collections for a selected commessa using services.store.ManageDB"""
+    """List collections for a selected commessa.
+
+    Returns two lists (mirroring the ammibot notebook pattern):
+      - ``collections``: ready collections (no active CollectionTask)
+      - ``processing``: collections with a pending/processing/error task
+        that should be displayed via the badge, not in the main list.
+    """
     commessa = request.GET.get('commessa', '').strip()
     if not commessa:
-        return JsonResponse({'collections': []})
+        return JsonResponse({'collections': [], 'processing': []})
 
     try:
+        from core.models import CollectionTask
+
         config = _load_config()
         db_manager = ManageDB(os.path.join(settings.BASE_DIR, 'config.yaml'))
         try:
@@ -301,13 +309,40 @@ def list_collections(request):
             else:
                 raise
 
-        formatted = [{
-            'name': c,
-            'displayName': c.replace('_', ' ').title(),
-            'commessa': commessa,
-        } for c in collections]
+        tasks_by_name = {}
+        for ct in CollectionTask.objects.filter(commessa=commessa):
+            existing = tasks_by_name.get(ct.collection_name)
+            if existing is None or ct.created_at > existing.created_at:
+                tasks_by_name[ct.collection_name] = ct
 
-        return JsonResponse({'collections': formatted, 'commessa': commessa})
+        ready = []
+        processing = []
+
+        for name in collections:
+            ct = tasks_by_name.get(name)
+            if ct and ct.status in ('pending', 'processing', 'error'):
+                processing.append({
+                    'id': ct.id,
+                    'commessa': commessa,
+                    'collection_name': name,
+                    'name': name,
+                    'displayName': name.replace('_', ' ').title(),
+                    'status': ct.status,
+                    'files_done': ct.files_done,
+                    'files_total': len(ct.files) if ct.files else 0,
+                })
+            else:
+                ready.append({
+                    'name': name,
+                    'displayName': name.replace('_', ' ').title(),
+                    'commessa': commessa,
+                })
+
+        return JsonResponse({
+            'collections': ready,
+            'processing': processing,
+            'commessa': commessa,
+        })
     except FileNotFoundError as exc:
         return JsonResponse({'error': str(exc)}, status=500)
     except Exception as exc:
@@ -315,7 +350,13 @@ def list_collections(request):
 
 
 def create_collection(request):
-    """POST JSON: { commessa, collection_name, files?: [relative paths] }"""
+    """POST JSON: { commessa, collection_name, files?: [relative paths] }
+
+    Creates an empty Milvus collection synchronously, then dispatches a Celery
+    task to index the selected files asynchronously.
+    Returns 202 Accepted when files are queued for processing, 200 when no
+    files were provided (empty collection created immediately).
+    """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
@@ -345,16 +386,59 @@ def create_collection(request):
             for rel_path in selected_files:
                 full_paths.append(os.path.join(jobs_base, commessa, rel_path))
 
+        # Create the empty Milvus collection synchronously (fast)
         db_manager = ManageDB(os.path.join(settings.BASE_DIR, 'config.yaml'))
-        db_manager.create_collection(commessa, collection_name, files=full_paths)
+        db_manager.create_collection(commessa, collection_name, files=[])
+
+        if not full_paths:
+            return JsonResponse({
+                'success': True,
+                'message': f'Collection {collection_name} created successfully',
+                'commessa': commessa,
+                'collection_name': collection_name,
+                'selected_files': [],
+            })
+
+        # Create task record and dispatch Celery job for file processing
+        from core.models import CollectionTask
+        from docslm.celery import app as celery_app
+
+        ct = CollectionTask.objects.create(
+            commessa=commessa,
+            collection_name=collection_name,
+            status='pending',
+            files=full_paths,
+            created_by=request.user if request.user.is_authenticated else None,
+        )
+
+        try:
+            conn = celery_app.connection()
+            conn.ensure_connection(max_retries=1, timeout=3)
+            conn.close()
+        except Exception:
+            ct.status = 'error'
+            ct.save(update_fields=['status'])
+            return JsonResponse(
+                {'error': 'Servizio di elaborazione non disponibile. Verifica che il broker sia attivo.'},
+                status=503,
+            )
+
+        from services.process import process_collection
+
+        result = process_collection.delay(ct.id)
+        ct.task_id = result.id
+        ct.save(update_fields=['task_id'])
 
         return JsonResponse({
             'success': True,
-            'message': f'Collection {collection_name} created successfully',
+            'message': f'Elaborazione della collection {collection_name} avviata',
             'commessa': commessa,
             'collection_name': collection_name,
             'selected_files': full_paths,
-        })
+            'collection_task_id': ct.id,
+            'status': ct.status,
+        }, status=202)
+
     except FileNotFoundError as exc:
         return JsonResponse({'error': str(exc)}, status=500)
     except Exception as exc:
@@ -364,6 +448,107 @@ def create_collection(request):
         if 'Invalid collection name' in error_msg:
             error_msg = 'Il nome della collection contiene caratteri non consentiti. Usa solo lettere, numeri e underscore.'
         return JsonResponse({'error': error_msg}, status=500)
+
+
+def collection_task_status(request):
+    """GET params: commessa, collection — return the latest task status.
+
+    Returns:
+        JSON with ``status`` field. Status is 'none' if no task exists.
+    """
+    commessa = request.GET.get('commessa', '').strip()
+    collection = request.GET.get('collection', '').strip()
+    if not commessa or not collection:
+        return JsonResponse({'error': 'Commessa and collection are required'}, status=400)
+
+    from core.models import CollectionTask
+
+    ct = CollectionTask.objects.filter(
+        commessa=commessa, collection_name=collection,
+    ).first()
+
+    if not ct:
+        return JsonResponse({'status': 'none'})
+
+    return JsonResponse({
+        'id': ct.id,
+        'commessa': ct.commessa,
+        'collection_name': ct.collection_name,
+        'status': ct.status,
+        'task_id': ct.task_id,
+        'files_done': ct.files_done,
+        'files_total': len(ct.files) if ct.files else 0,
+        'created_at': ct.created_at.isoformat(),
+    })
+
+
+def active_collection_tasks(request):
+    """Return all CollectionTask records that are still pending or processing.
+
+    For each pending task, checks whether the Celery task is still alive in the
+    broker. If the task is orphaned (lost from Redis), it is automatically
+    re-dispatched so the worker can pick it up without the user having to
+    recreate the collection.
+
+    Returns:
+        JSON with a ``tasks`` list, each entry mirroring collection_task_status.
+    """
+    from celery.result import AsyncResult
+    from core.models import CollectionTask
+    from docslm.celery import app as celery_app
+
+    tasks = CollectionTask.objects.filter(status__in=['pending', 'processing'])
+
+    for ct in tasks:
+        if not ct.task_id:
+            _redispatch_collection_task(ct)
+            continue
+
+        result = AsyncResult(ct.task_id, app=celery_app)
+        if result.state in ('FAILURE', 'REVOKED'):
+            ct.status = 'error'
+            ct.save(update_fields=['status'])
+        elif result.state in ('PENDING',):
+            # Celery reports PENDING both for "queued" and "unknown task ID".
+            # If the task was created more than 2 minutes ago and is still
+            # PENDING, the broker likely lost it — re-dispatch.
+            from django.utils import timezone
+            age = timezone.now() - ct.created_at
+            if age.total_seconds() > 120:
+                _redispatch_collection_task(ct)
+
+    tasks = CollectionTask.objects.filter(status__in=['pending', 'processing'])
+
+    return JsonResponse({
+        'tasks': [
+            {
+                'id': ct.id,
+                'commessa': ct.commessa,
+                'collection_name': ct.collection_name,
+                'status': ct.status,
+                'files_done': ct.files_done,
+                'files_total': len(ct.files) if ct.files else 0,
+            }
+            for ct in tasks
+        ]
+    })
+
+
+def _redispatch_collection_task(ct) -> None:
+    """Re-dispatch a CollectionTask whose Celery task was lost.
+
+    Args:
+        ct: CollectionTask instance to re-dispatch.
+    """
+    try:
+        from services.process import process_collection
+        result = process_collection.delay(ct.id)
+        ct.task_id = result.id
+        ct.status = 'pending'
+        ct.save(update_fields=['task_id', 'status'])
+        logger.info("Re-dispatched CollectionTask %s (new task_id=%s)", ct.id, result.id)
+    except Exception:
+        logger.exception("Failed to re-dispatch CollectionTask %s", ct.id)
 
 
 def list_collection_files(request):

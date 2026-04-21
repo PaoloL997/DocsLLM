@@ -6,6 +6,8 @@ from .utilities.files import (
     list_collection_files,
     list_collections,
     create_collection,
+    collection_task_status,
+    active_collection_tasks,
     delete_collection_file,
     delete_collection,
 )
@@ -27,6 +29,8 @@ __all__ = [
     "list_collection_files",
     "list_collections",
     "create_collection",
+    "collection_task_status",
+    "active_collection_tasks",
     "delete_collection_file",
     "delete_collection",
     "search_commesse",

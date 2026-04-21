@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeDropdown();
         restoreSelectedCommessa();
         setupUserMenu();
-        
+        restoreActiveCollectionTasks();
+
         // Check for any blocking overlays
         setTimeout(() => {
             const modals = document.querySelectorAll('.create-collection-modal, .modal');
@@ -207,7 +208,7 @@ function setupEventListeners() {
     // Modal click outside to close
     if (createCollectionModal) {
         createCollectionModal.addEventListener('click', (e) => {
-            if (isProcessing) return; // Don't close during processing
+            if (isProcessing || isCollectionCreating) return;
             if (e.target === createCollectionModal) {
                 closeCreateCollectionModalFunc();
             }
@@ -295,7 +296,7 @@ function setupEventListeners() {
     }
 
     window.addEventListener('click', (e) => {
-        if (isProcessing) return; // Don't close modal during processing
+        if (isProcessing || isCollectionCreating) return;
         
         const createModal = document.getElementById('createCollectionModal');
         const reportModal = document.getElementById('reportUploadModal');
@@ -324,7 +325,7 @@ function setupEventListeners() {
 
     // Allow closing modals with ESC key
     document.addEventListener('keydown', (e) => {
-        if (isProcessing) return; // Don't close modal during processing
+        if (isProcessing || isCollectionCreating) return;
         
         if (e.key === 'Escape') {
             const createModal = document.getElementById('createCollectionModal');
@@ -544,6 +545,7 @@ async function loadCollections(commessaCode, container) {
         
         if (data.collections) {
             renderCollections(data.collections, container, commessaCode);
+            mergeProcessingTasks(commessaCode, data.processing || []);
         } else if (data.error) {
             console.error('Collections error:', data.error);
             // Show error message to user
@@ -656,6 +658,45 @@ let modalSelectedFiles = [];
 let activeCollection = null;
 // Flag to track if documents are being processed
 let isProcessing = false;
+// Flag to lock the create-collection modal while the creation request is in flight
+let isCollectionCreating = false;
+// Active Celery collection processing tasks
+let activeCollectionTasks = [];
+let collectionTaskPollInterval = null;
+
+function mergeProcessingTasks(commessa, processing) {
+    // Drop any previously tracked tasks for this commessa and replace with the
+    // fresh server-side snapshot. Tasks from other commesse are kept intact.
+    activeCollectionTasks = activeCollectionTasks.filter(t => t.commessa !== commessa);
+    (processing || []).forEach(p => activeCollectionTasks.push({
+        id: p.id,
+        commessa: p.commessa,
+        collection_name: p.collection_name,
+        status: p.status,
+        files_done: p.files_done ?? 0,
+        files_total: p.files_total ?? 0,
+    }));
+    updateCollectionProcessingBadge();
+    const hasInProgress = activeCollectionTasks.some(
+        t => t.status === 'pending' || t.status === 'processing'
+    );
+    if (hasInProgress) startCollectionPolling();
+}
+
+async function restoreActiveCollectionTasks() {
+    try {
+        const res = await fetch('/api/collection-tasks/active/');
+        if (!res.ok) return;
+        const data = await res.json();
+        const tasks = data.tasks || [];
+        if (tasks.length === 0) return;
+        activeCollectionTasks = tasks;
+        updateCollectionProcessingBadge();
+        startCollectionPolling();
+    } catch (e) {
+        console.warn('Could not restore active collection tasks:', e);
+    }
+}
 // User is always authenticated on this page (protected by @login_required)
 let isLoggedIn = true;
 
@@ -2318,6 +2359,7 @@ async function loadCollections(commessaCode, container) {
         
         if (data.collections) {
             renderCollections(data.collections, container, commessaCode);
+            mergeProcessingTasks(commessaCode, data.processing || []);
         } else if (data.error) {
             console.error('Collections error:', data.error);
             // Show error message to user
@@ -2705,6 +2747,8 @@ async function createCollection(commessaCode, collectionName) {
     console.log('Elements found:', { confirmBtn: !!confirmBtn, body: !!body });
     
     try {
+        isCollectionCreating = true;
+
         // Disable button and show loading state
         if (confirmBtn) {
             confirmBtn.disabled = true;
@@ -2748,8 +2792,21 @@ async function createCollection(commessaCode, collectionName) {
         const data = await response.json();
         console.log('Response data:', data);
         
-        if (data.success) {
-            // Show success message
+        if (response.status === 202 && data.collection_task_id) {
+            // Async path: task dispatched — close modal immediately and show badge
+            closeCreateCollectionModalFunc();
+            activeCollectionTasks.push({
+                id: data.collection_task_id,
+                commessa: data.commessa,
+                collection_name: data.collection_name,
+                status: data.status || 'pending',
+                files_done: 0,
+                files_total: (data.selected_files || []).length,
+            });
+            updateCollectionProcessingBadge();
+            startCollectionPolling();
+        } else if (data.success) {
+            // Sync path: empty collection created (no files)
             if (body) {
                 body.innerHTML = `
                     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:60px 40px;height:100%;text-align:center;">
@@ -2764,13 +2821,13 @@ async function createCollection(commessaCode, collectionName) {
                     </div>
                 `;
             }
-            
             setTimeout(() => {
                 closeCreateCollectionModalFunc();
                 window.location.reload();
             }, 1500);
         } else {
-            // Show error message
+            // Show error message — unlock modal so user can close it
+            isCollectionCreating = false;
             if (body) {
                 body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore:</strong> ${data.error}</div>`;
             }
@@ -2782,6 +2839,7 @@ async function createCollection(commessaCode, collectionName) {
         }
     } catch (error) {
         console.error('Error creating collection:', error);
+        isCollectionCreating = false;
         if (body) {
             body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore di connessione:</strong> ${error.message}</div>`;
         }
@@ -3705,4 +3763,166 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// ── Collection processing badge & modal ───────────────────────────────────────
+
+function updateCollectionProcessingBadge() {
+    const badge = document.getElementById('processingBadge');
+    if (!badge) return;
+
+    if (activeCollectionTasks.length === 0) {
+        badge.style.display = 'none';
+        closeProcessingModal();
+        return;
+    }
+
+    const inProgress = activeCollectionTasks.filter(t => t.status === 'pending' || t.status === 'processing');
+    const withError = activeCollectionTasks.filter(t => t.status === 'error');
+
+    badge.style.display = 'flex';
+
+    const spinner = document.getElementById('processingSpinner');
+    if (spinner) {
+        if (inProgress.length > 0) {
+            spinner.className = 'processing-spinner';
+            spinner.style.cssText = '';
+            spinner.textContent = '';
+        } else if (withError.length > 0) {
+            spinner.className = '';
+            spinner.style.cssText = 'font-size:14px;line-height:1;flex-shrink:0;';
+            spinner.textContent = '⚠️';
+        } else {
+            spinner.className = '';
+            spinner.style.cssText = 'font-size:14px;line-height:1;flex-shrink:0;';
+            spinner.textContent = '✅';
+        }
+    }
+
+    const parts = [];
+    if (inProgress.length > 0) {
+        parts.push(inProgress.length === 1
+            ? '1 collection in elaborazione'
+            : `${inProgress.length} collection in elaborazione`);
+    }
+    if (withError.length > 0) {
+        parts.push(withError.length === 1 ? '1 con errore' : `${withError.length} con errore`);
+    }
+    if (inProgress.length === 0 && withError.length === 0) {
+        parts.push('Elaborazione completata');
+    }
+    document.getElementById('processingBadgeText').textContent = parts.join(', ');
+
+    const processingModal = document.getElementById('processingModal');
+    if (processingModal && processingModal.style.display === 'flex') {
+        renderCollectionProcessingModal();
+    }
+}
+
+function openProcessingModal() {
+    const modal = document.getElementById('processingModal');
+    if (!modal) return;
+    renderCollectionProcessingModal();
+    modal.style.display = 'flex';
+}
+
+function closeProcessingModal() {
+    const modal = document.getElementById('processingModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function renderCollectionProcessingModal() {
+    const body = document.getElementById('processingModalBody');
+    if (!body) return;
+
+    if (!activeCollectionTasks || activeCollectionTasks.length === 0) {
+        body.innerHTML = '<p style="font-size:13px;color:var(--text-light);margin:0;">Nessuna collection in elaborazione.</p>';
+        return;
+    }
+
+    body.innerHTML = activeCollectionTasks.map(t => {
+        const isError = t.status === 'error';
+        const isReady = t.status === 'ready';
+        const label = t.collection_name.replace(/_/g, ' ');
+
+        let statusEl;
+        if (isError) {
+            statusEl = `<span style="color:#e74c3c;font-size:12px;font-weight:500;">⚠ Errore</span>`;
+        } else if (isReady) {
+            statusEl = `<span style="color:#27ae60;font-size:12px;font-weight:500;">✓ Completato</span>`;
+        } else {
+            const done = t.files_done ?? 0;
+            const total = t.files_total ?? 0;
+            const progress = total > 0 ? `${done}/${total} file` : 'In attesa...';
+            statusEl = `<span style="color:var(--text-light);font-size:12px;display:flex;align-items:center;gap:6px;">
+                <div style="width:10px;height:10px;border:2px solid rgba(212,112,77,0.2);border-top:2px solid var(--accent-color);border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;"></div>
+                ${progress}
+            </span>`;
+        }
+
+        return `
+            <div class="processing-item" style="${isError ? 'border-color:#e74c3c40;' : ''}">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <div>
+                        <div class="processing-item-name">${escapeHtml(label)}</div>
+                        <div style="font-size:11px;color:var(--text-light);">${escapeHtml(t.commessa)}</div>
+                    </div>
+                    ${statusEl}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function startCollectionPolling() {
+    if (collectionTaskPollInterval) return;
+    collectionTaskPollInterval = setInterval(pollCollectionTasks, 2000);
+}
+
+function stopCollectionPolling() {
+    if (collectionTaskPollInterval) {
+        clearInterval(collectionTaskPollInterval);
+        collectionTaskPollInterval = null;
+    }
+}
+
+async function pollCollectionTasks() {
+    const pending = activeCollectionTasks.filter(t => t.status === 'pending' || t.status === 'processing');
+    if (pending.length === 0) {
+        stopCollectionPolling();
+        return;
+    }
+
+    for (const task of pending) {
+        try {
+            const res = await fetch(
+                `/api/collection-task-status/?commessa=${encodeURIComponent(task.commessa)}&collection=${encodeURIComponent(task.collection_name)}`
+            );
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data.status && data.status !== task.status) {
+                task.status = data.status;
+            }
+            if (typeof data.files_done === 'number') task.files_done = data.files_done;
+            if (typeof data.files_total === 'number') task.files_total = data.files_total;
+        } catch (e) {
+            console.warn('Collection poll error:', e);
+        }
+    }
+
+    updateCollectionProcessingBadge();
+
+    const allDone = activeCollectionTasks.every(t => t.status === 'ready' || t.status === 'error');
+    if (allDone && activeCollectionTasks.length > 0) {
+        stopCollectionPolling();
+        const hasErrors = activeCollectionTasks.some(t => t.status === 'error');
+        if (!hasErrors) {
+            // All completed successfully — reload after a brief pause
+            setTimeout(() => {
+                activeCollectionTasks = [];
+                window.location.reload();
+            }, 2000);
+        }
+        // On errors: keep badge visible so user can see what failed
+    }
 }

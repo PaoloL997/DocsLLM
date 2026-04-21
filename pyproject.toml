@@ -20,6 +20,8 @@ duckling = {git = "https://github.com/PaoloL997/duckling.git", rev = "feat/docli
 djangorestframework = "^3.17.1"
 djangorestframework-simplejwt = "^5.5.1"
 django-cors-headers = "^4.9.0"
+celery = {version = "^5.5.2", extras = ["redis"]}
+redis = ">=7.1.0,<8.0.0"
 
 [[tool.poetry.source]]
 name = "pytorch"
