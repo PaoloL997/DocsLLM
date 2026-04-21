@@ -31,7 +31,8 @@ def main():
     args = parser.parse_args()
 
     python = sys.executable
-    manage = os.path.join(os.path.dirname(__file__), "docslm", "manage.py")
+    base = os.path.dirname(__file__)
+    manage = os.path.join(base, "manage.py")
 
     django_cmd = [python, manage, "runserver", f"0.0.0.0:{args.port}"]
     celery_cmd = [python, "-m", "celery", "-A", "docslm", "worker", "--loglevel=info", "--pool=solo"]
@@ -39,8 +40,8 @@ def main():
     processes = []
 
     try:
-        processes.append(subprocess.Popen(django_cmd, cwd=os.path.join(os.path.dirname(__file__), "docslm")))
-        processes.append(subprocess.Popen(celery_cmd, cwd=os.path.join(os.path.dirname(__file__), "docslm")))
+        processes.append(subprocess.Popen(django_cmd, cwd=base))
+        processes.append(subprocess.Popen(celery_cmd, cwd=base))
 
         for p in processes:
             p.wait()
