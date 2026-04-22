@@ -1246,6 +1246,32 @@ function showDeleteConfirmationBanner(filename) {
     }, 1000);
 }
 
+function showWarningBanner(message) {
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffc107;
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 13px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        animation: slideInUp 0.3s ease-out;
+        max-width: 360px;
+        word-break: break-word;
+    `;
+    banner.textContent = `⚠️ ${message}`;
+    document.body.appendChild(banner);
+    setTimeout(() => {
+        banner.style.animation = 'slideOutDown 0.3s ease-in';
+        setTimeout(() => banner.remove(), 300);
+    }, 7000);
+}
+
 function autoResizeTextarea(textarea) {
     if (!textarea) return;
     textarea.style.height = 'auto';
@@ -2805,6 +2831,9 @@ async function createCollection(commessaCode, collectionName) {
             });
             updateCollectionProcessingBadge();
             startCollectionPolling();
+            if (data.warnings && data.warnings.length > 0) {
+                data.warnings.forEach(msg => showWarningBanner(msg));
+            }
         } else if (data.success) {
             // Sync path: empty collection created (no files)
             if (body) {

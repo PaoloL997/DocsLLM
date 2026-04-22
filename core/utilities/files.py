@@ -381,10 +381,17 @@ def create_collection(request):
         config = _load_config()
         selected_files = data.get('files', []) if isinstance(data, dict) else []
         full_paths = []
+        warnings = []
         if selected_files:
             jobs_base = config.get('jobs', '')
             for rel_path in selected_files:
-                full_paths.append(os.path.join(jobs_base, commessa, rel_path))
+                full_path = os.path.join(jobs_base, commessa, rel_path)
+                full_paths.append(full_path)
+                stem = Path(full_path).stem
+                if stem != stem.strip():
+                    warnings.append(
+                        f'"{Path(full_path).name}" contiene spazi nel nome: il processing potrebbe fallire. Rinomina il file.'
+                    )
 
         # Create the empty Milvus collection synchronously (fast)
         db_manager = ManageDB(os.path.join(settings.BASE_DIR, 'config.yaml'))
@@ -437,6 +444,7 @@ def create_collection(request):
             'selected_files': full_paths,
             'collection_task_id': ct.id,
             'status': ct.status,
+            'warnings': warnings,
         }, status=202)
 
     except FileNotFoundError as exc:
