@@ -68,6 +68,13 @@ def process_collection(collection_task_id: int) -> dict:
         for file_path in ct.files:
             try:
                 filename = Path(file_path).stem
+                if filename != filename.strip():
+                    logger.warning(
+                        "Il file '%s' contiene spazi iniziali o finali nel nome: "
+                        "il processing potrebbe fallire su Windows. "
+                        "Rinomina il file rimuovendo gli spazi.",
+                        file_path,
+                    )
                 result = DucklingGraph().run(file_path, namespace=filename)
                 documents = result.get('documents', [])
 
