@@ -2505,3 +2505,645 @@ html, body {
         gap: 8px;
     }
 }
+
+/* ===== Cronologia Page ===== */
+
+.cronologia-body {
+    background-color: var(--primary-color);
+    min-height: 100vh;
+}
+
+/* Logo fixed top-left */
+.cronologia-brand {
+    position: fixed;
+    top: 20px;
+    left: 24px;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cronologia-brand-icon {
+    font-size: 22px;
+    color: var(--accent-color);
+    line-height: 1;
+}
+
+.cronologia-brand-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-color);
+    letter-spacing: 0.3px;
+}
+
+/* User avatar fixed bottom-left */
+.cronologia-user-area {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 200;
+}
+
+.cronologia-user-area .sidebar-avatar {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.cronologia-user-area .sidebar-avatar:hover {
+    opacity: 0.85;
+}
+
+.cronologia-user-area .sidebar-user-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    top: auto;
+    right: auto;
+    margin: 0;
+}
+
+/* Main area */
+.cronologia-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 90px 24px 60px;
+    gap: 24px;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Controls row — fixed top, centered between logo and navbar */
+.cronologia-controls {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    z-index: 200;
+    width: max-content;
+    max-width: calc(100vw - 460px);
+}
+
+.cronologia-commessa-wrap {
+    position: relative;
+    flex: 0 0 260px;
+}
+
+.cronologia-commessa-bar,
+.cronologia-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 10px 16px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cronologia-search-bar {
+    flex: 2;
+    min-width: 280px;
+}
+
+.cronologia-commessa-bar:focus-within,
+.cronologia-search-bar:focus-within {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(212, 112, 77, 0.1);
+}
+
+.cronologia-ctrl-icon {
+    color: var(--text-light);
+    flex-shrink: 0;
+    transition: color 0.2s;
+}
+
+.cronologia-commessa-bar:focus-within .cronologia-ctrl-icon,
+.cronologia-search-bar:focus-within .cronologia-ctrl-icon {
+    color: var(--accent-color);
+}
+
+.cronologia-ctrl-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: 'Fira Mono', monospace;
+    font-size: 13px;
+    color: var(--text-color);
+    min-width: 0;
+}
+
+.cronologia-ctrl-input::placeholder {
+    color: #b0b0b0;
+}
+
+.cronologia-ctrl-clear {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    border-radius: 50%;
+    transition: color 0.2s, background 0.2s;
+    flex-shrink: 0;
+}
+
+.cronologia-ctrl-clear:hover {
+    color: var(--accent-color);
+    background: var(--button-hover);
+}
+
+/* Commessa dropdown */
+.cronologia-commessa-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+    padding: 6px;
+    z-index: 300;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.cronologia-commessa-option {
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-color);
+    transition: background 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cronologia-commessa-option:hover {
+    background: var(--button-hover);
+}
+
+.cronologia-commessa-option-code {
+    font-weight: 600;
+}
+
+.cronologia-commessa-option-meta {
+    font-size: 11px;
+    color: var(--text-light);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cronologia-commessa-bar.has-selection {
+    border-color: var(--accent-color);
+    background: var(--button-hover);
+}
+
+.cronologia-commessa-bar.has-selection .cronologia-ctrl-icon {
+    color: var(--accent-color);
+}
+
+/* Results */
+.cronologia-results {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 40px;
+}
+
+.cronologia-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-light);
+    font-size: 14px;
+    font-style: italic;
+}
+
+.cronologia-item {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.cronologia-item:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 16px rgba(212, 112, 77, 0.08);
+}
+
+.cronologia-item-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cronologia-item-commessa {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-color);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--button-bg);
+    padding: 2px 10px;
+    border-radius: 999px;
+}
+
+.cronologia-item-date {
+    font-size: 11px;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+.cronologia-item-q {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-color);
+    line-height: 1.45;
+}
+
+.cronologia-item-a {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.55;
+    border-left: 2px solid var(--border-color);
+    padding-left: 10px;
+    margin-top: 2px;
+}
+
+@media (max-width: 600px) {
+    .cronologia-brand-name {
+        display: none;
+    }
+
+    .cronologia-controls {
+        flex-direction: column;
+    }
+
+    .cronologia-commessa-wrap {
+        flex: unset;
+        width: 100%;
+    }
+}
+
+/* ── Cronologia Cards ──────────────────────────────────────────────────── */
+.cronologia-results {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    width: 100%;
+    padding-bottom: 40px;
+}
+
+.cronologia-empty {
+    grid-column: 1 / -1;
+}
+
+.cronologia-card {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.cronologia-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 16px rgba(212, 112, 77, 0.08);
+}
+
+.cronologia-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cronologia-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--button-hover);
+    color: var(--accent-color);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.cronologia-card-user {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-light);
+}
+
+.cronologia-card-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.cronologia-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cronologia-card-q,
+.cronologia-card-a {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cronologia-card-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-light);
+}
+
+.cronologia-card-q p,
+.cronologia-card-a p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-color);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.cronologia-card-q p {
+    font-weight: 600;
+}
+
+.cronologia-card-a {
+    background: var(--background-color);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+/* Markdown content inside cronologia cards */
+.cronologia-card-markdown {
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text-color);
+    word-wrap: break-word;
+}
+
+.cronologia-card-markdown p { margin: 0 0 8px; }
+.cronologia-card-markdown p:last-child { margin-bottom: 0; }
+.cronologia-card-markdown strong { font-weight: 700; }
+.cronologia-card-markdown em { font-style: italic; }
+.cronologia-card-markdown h1,
+.cronologia-card-markdown h2,
+.cronologia-card-markdown h3,
+.cronologia-card-markdown h4 {
+    margin: 10px 0 6px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+.cronologia-card-markdown h1 { font-size: 17px; }
+.cronologia-card-markdown h2 { font-size: 16px; }
+.cronologia-card-markdown h3 { font-size: 15px; }
+.cronologia-card-markdown h4 { font-size: 14px; }
+.cronologia-card-markdown ul,
+.cronologia-card-markdown ol {
+    margin: 6px 0 8px;
+    padding-left: 22px;
+}
+.cronologia-card-markdown li { margin: 3px 0; }
+.cronologia-card-markdown a {
+    color: var(--accent-color);
+    text-decoration: underline;
+}
+.cronologia-card-markdown code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px;
+}
+.cronologia-card-markdown pre {
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+.cronologia-card-markdown pre code {
+    background: none;
+    padding: 0;
+    font-size: 12.5px;
+}
+.cronologia-card-markdown blockquote {
+    border-left: 3px solid var(--border-color);
+    padding-left: 10px;
+    margin: 6px 0;
+    color: var(--text-light);
+}
+
+/* Fixed-size cards with truncated response */
+.cronologia-results {
+    grid-auto-rows: 320px;
+    align-items: stretch;
+}
+
+.cronologia-card {
+    height: 320px;
+    overflow: hidden;
+}
+
+.cronologia-card-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cronologia-card-q {
+    flex-shrink: 0;
+    max-height: 80px;
+    overflow: hidden;
+}
+
+.cronologia-card-q p {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cronologia-card-a {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+}
+
+.cronologia-card-response-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+}
+
+.cronologia-card-markdown {
+    height: 100%;
+    overflow: hidden;
+}
+
+.cronologia-card-expand {
+    align-self: flex-end;
+    background: var(--accent-color);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: opacity 0.15s;
+    margin-top: 2px;
+}
+
+.cronologia-card-expand:hover {
+    opacity: 0.85;
+}
+
+/* Modal */
+.cronologia-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.cronologia-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+}
+
+.cronologia-modal-dialog {
+    position: relative;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    max-width: 900px;
+    width: 100%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+}
+
+.cronologia-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 16px;
+}
+
+.cronologia-modal-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--text-light);
+    flex-wrap: wrap;
+}
+
+.cronologia-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+    display: inline-flex;
+    transition: background 0.15s, color 0.15s;
+}
+
+.cronologia-modal-close:hover {
+    background: var(--button-hover);
+    color: var(--text-color);
+}
+
+.cronologia-modal-body {
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cronologia-modal-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-light);
+    margin-bottom: 4px;
+    display: block;
+}
+
+.cronologia-modal-question {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.5;
+    margin: 0;
+    color: var(--text-color);
+}
+
+.cronologia-modal-answer {
+    background: var(--background-color);
+    border-radius: 10px;
+    padding: 14px 16px;
+}

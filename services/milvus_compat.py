@@ -25,8 +25,35 @@ def apply():
 
     from langchain_milvus import Milvus
     from pymilvus import Collection, connections
+    from pymilvus.exceptions import SchemaNotReadyException
 
     _original_fset = Milvus.col.fset
+
+    def _ensure_orm_connection(instance):
+        """Register the ORM connection for ``instance.alias`` with the correct db.
+
+        Always reconnects to guarantee the alias points at the db_name declared
+        in ``_connection_args`` — a stale alias registered against the wrong db
+        would make ``Collection(name, using=alias)`` look in the wrong database.
+        """
+        conn_args = instance._connection_args or {}
+        uri = conn_args.get("uri", "http://localhost:19530")
+        db_name = conn_args.get("db_name", "")
+        host = uri.split("://")[1].split(":")[0]
+        port = int(uri.split(":")[-1])
+
+        try:
+            existing = connections._fetch_handler(instance.alias)
+            existing_db = getattr(existing, "_kwargs", {}).get("db_name", "") if existing else ""
+            if existing_db == db_name:
+                return
+            connections.disconnect(instance.alias)
+        except Exception:
+            pass
+
+        connections.connect(
+            alias=instance.alias, host=host, port=port, db_name=db_name,
+        )
 
     def _patched_col_fget(self):
         current_key = f"{self.collection_name}:{self.alias}"
@@ -34,29 +61,25 @@ def apply():
         if self._cache_key == current_key and self._col_cache is not None:
             return self._col_cache
 
-        if self.client.has_collection(self.collection_name):
-            try:
-                connections._fetch_handler(self.alias)
-            except Exception:
-                conn_args = self._connection_args or {}
-                uri = conn_args.get("uri", "http://localhost:19530")
-                db_name = conn_args.get("db_name", "")
-                host = uri.split("://")[1].split(":")[0]
-                port = int(uri.split(":")[-1])
-                connections.connect(
-                    alias=self.alias, host=host, port=port, db_name=db_name,
-                )
+        if not self.client.has_collection(self.collection_name):
+            self._col_cache = None
+            self._cache_key = None
+            return None
 
+        _ensure_orm_connection(self)
+
+        try:
             self._col_cache = Collection(
                 self.collection_name, using=self.alias,
             )
-            if self.collection_properties is not None:
-                self._col_cache.set_properties(self.collection_properties)
-            self._cache_key = current_key
-            return self._col_cache
+        except SchemaNotReadyException:
+            self._col_cache = None
+            self._cache_key = None
+            return None
 
-        self._col_cache = None
-        self._cache_key = None
-        return None
+        if self.collection_properties is not None:
+            self._col_cache.set_properties(self.collection_properties)
+        self._cache_key = current_key
+        return self._col_cache
 
     Milvus.col = property(_patched_col_fget, _original_fset)

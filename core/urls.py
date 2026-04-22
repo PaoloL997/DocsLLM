@@ -6,6 +6,7 @@ app_name = 'core'
 urlpatterns = [
     path('', views.index, name='index'),
     path('ricerca/', views.ricerca, name='ricerca'),
+    path('cronologia/', views.cronologia, name='cronologia'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('api/send-message/', views.send_message, name='send_message'),
@@ -24,4 +25,5 @@ urlpatterns = [
     path('api/check-path/', views.check_path, name='check_path'),
     path('api/initialize-search-store/', views.initialize_search_store, name='initialize_search_store'),
     path('api/search-documents/', views.search_documents, name='search_documents'),
+    path('api/cronologia/<str:commessa>/', views.get_cronologia, name='get_cronologia'),
 ]

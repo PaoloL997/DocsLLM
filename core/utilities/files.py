@@ -6,6 +6,7 @@ import base64
 import mimetypes
 import logging
 import yaml
+from pathlib import Path
 from django.conf import settings
 from django.http import JsonResponse
 

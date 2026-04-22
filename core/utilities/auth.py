@@ -23,6 +23,12 @@ def ricerca(request):
     return render(request, 'ricerca.html')
 
 
+@login_required
+def cronologia(request):
+    """Render the history page."""
+    return render(request, 'cronologia.html')
+
+
 @ensure_csrf_cookie
 def login_view(request):
     """Handle login page rendering and form submission.

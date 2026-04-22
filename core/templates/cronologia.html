@@ -1,0 +1,105 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocsLLM - Cronologia</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=5">
+</head>
+<body class="cronologia-body">
+
+    <!-- Logo top-left -->
+    <div class="cronologia-brand">
+        <span class="cronologia-brand-icon">✱</span>
+        <span class="cronologia-brand-name">DocsLLM</span>
+    </div>
+
+    <!-- User avatar bottom-left -->
+    <div class="cronologia-user-area">
+        <div class="sidebar-avatar" id="userAvatarBtn" title="{{ user.username }}">
+            {{ user.username.0|upper }}
+        </div>
+        <div class="sidebar-user-menu" id="userMenu" style="display:none;">
+            <button class="sidebar-user-menu-item" id="logoutBtn">Esci</button>
+        </div>
+    </div>
+
+    <!-- Navigation (fixed top-right, same as other pages) -->
+    <nav class="top-nav">
+        <div class="nav-pills">
+            <a href="/" class="nav-pill">Chiedi</a>
+            <a href="/ricerca/" class="nav-pill">Ricerca</a>
+            <a href="/cronologia/" class="nav-pill active">Cronologia</a>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="cronologia-main">
+
+        <!-- Controls row: commessa selector + search -->
+        <div class="cronologia-controls">
+
+            <!-- Commessa selector -->
+            <div class="cronologia-commessa-wrap" id="commessaWrap">
+                <div class="cronologia-commessa-bar" id="commessaBar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cronologia-ctrl-icon">
+                        <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                    <input
+                        type="text"
+                        id="commessaSearchInput"
+                        class="cronologia-ctrl-input"
+                        placeholder="Cerca commessa…"
+                        autocomplete="off"
+                    >
+                    <button class="cronologia-ctrl-clear" id="commessaClearBtn" style="display:none;" title="Rimuovi selezione">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+                <div class="cronologia-commessa-dropdown" id="commessaDropdown" style="display:none;"></div>
+            </div>
+
+            <!-- History search bar -->
+            <div class="cronologia-search-bar" id="cronologiaSearchBar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="cronologia-ctrl-icon">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                    type="text"
+                    id="cronologiaSearchInput"
+                    class="cronologia-ctrl-input"
+                    placeholder="Cerca nella cronologia…"
+                    autocomplete="off"
+                >
+            </div>
+
+        </div>
+
+        <!-- Results area -->
+        <div class="cronologia-results" id="cronologiaResults">
+            <p class="cronologia-empty">Seleziona una commessa per visualizzare la cronologia.</p>
+        </div>
+
+    </main>
+
+    <!-- Expand modal -->
+    <div class="cronologia-modal" id="cronologiaModal" style="display:none;">
+        <div class="cronologia-modal-backdrop" id="cronologiaModalBackdrop"></div>
+        <div class="cronologia-modal-dialog" role="dialog" aria-modal="true">
+            <header class="cronologia-modal-head">
+                <div class="cronologia-modal-meta" id="cronologiaModalMeta"></div>
+                <button class="cronologia-modal-close" id="cronologiaModalClose" title="Chiudi">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </header>
+            <div class="cronologia-modal-body" id="cronologiaModalBody"></div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/cronologia.js' %}?v=3"></script>
+</body>
+</html>
