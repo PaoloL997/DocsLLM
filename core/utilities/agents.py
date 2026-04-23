@@ -7,9 +7,6 @@ from django.http import JsonResponse
 # In-memory agent store (per session). TODO: replace with Redis.
 AGENT_INSTANCES = {}
 
-# In-memory report cache (token -> {file_buffer, filename, timestamp})
-REPORT_CACHE = {}
-
 
 def _idx_to_letters(i: int) -> str:
     result = ''
@@ -86,105 +83,6 @@ def send_message(request):
         import traceback
         traceback.print_exc()
         return JsonResponse({'error': f"Errore durante l'invocazione dell'agent: {str(e)}"}, status=500)
-
-
-def generate_report(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    
-    try:
-        if 'file' not in request.FILES:
-            return JsonResponse({'error': 'File Excel richiesto'}, status=400)
-        
-        excel_file = request.FILES['file']
-        commessa = request.POST.get('commessa', '').strip()
-        collection = request.POST.get('collection', '').strip()
-        
-        if not commessa or not collection:
-            return JsonResponse({'error': 'Commessa e collection richiesti'}, status=400)
-        
-        session_key = request.session.session_key
-        agent = AGENT_INSTANCES.get(session_key)
-        
-        if not agent:
-            return JsonResponse({'error': 'Agent non trovato'}, status=400)
-
-        user_id = request.user.username
-
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
-            for chunk in request.FILES['file'].chunks():
-                tmp.write(chunk)
-            tmp_path = tmp.name
-
-        try:
-            result = agent.report(tmp_path, user_id=user_id)
-        finally:
-            os.remove(tmp_path)
-
-        token = str(uuid.uuid4())
-        REPORT_CACHE[token] = {
-            'file_buffer': result['file_buffer'],
-            'filename': result['filename'],
-            'timestamp': time.time(),
-            'session_key': session_key
-        }
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Report elaborato con successo',
-            'commessa': commessa,
-            'collection': collection,
-            'filename': result.get('filename'),
-            'download_token': token,
-            'query_count': result.get('query_count')
-        })
-    
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'error': str(e)}, status=500)
-
-
-def download_report(request):
-    """Serve a report file from cache using token"""
-    if request.method != 'GET':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    
-    try:
-        token = request.GET.get('token', '')
-        filename = request.GET.get('filename', '')
-        
-        if not token or token not in REPORT_CACHE:
-            return JsonResponse({'error': 'Report not found or expired'}, status=404)
-        
-        report_data = REPORT_CACHE[token]
-        
-        # Optional: verify session security
-        session_key = request.session.session_key
-        if report_data.get('session_key') != session_key:
-            return JsonResponse({'error': 'Unauthorized'}, status=403)
-        
-        # Get file buffer and reset position
-        file_buffer = report_data['file_buffer']
-        file_buffer.seek(0)
-        
-        # Stream the file
-        from django.http import FileResponse
-        response = FileResponse(
-            file_buffer,
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = f'attachment; filename="{report_data["filename"]}"'
-        
-        # Clean up cache entry after download
-        del REPORT_CACHE[token]
-        
-        return response
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'error': str(e)}, status=500)
 
 
 def initialize_agent(request):

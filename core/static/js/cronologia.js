@@ -190,9 +190,9 @@
 
         resultsEl.innerHTML = filteredItems.map((it, idx) => renderCard(it, idx)).join('');
 
-        resultsEl.querySelectorAll('.cronologia-card-expand').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt(btn.dataset.expand, 10);
+        resultsEl.querySelectorAll('.cronologia-card').forEach((card) => {
+            card.addEventListener('click', () => {
+                const idx = parseInt(card.dataset.index, 10);
                 openModal(filteredItems[idx]);
             });
         });
@@ -271,10 +271,6 @@
                         <div class="cronologia-card-response-wrap">
                             <div class="cronologia-card-markdown">${responseHtml}</div>
                         </div>
-                        <button class="cronologia-card-expand" data-expand="${index}">
-                            Estendi
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-                        </button>
                     </div>
                 </div>
             </article>

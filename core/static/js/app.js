@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
         restoreSelectedCommessa();
         setupUserMenu();
         restoreActiveCollectionTasks();
+        restoreActiveReportTasks();
 
         // Check for any blocking overlays
         setTimeout(() => {
@@ -663,6 +664,9 @@ let isCollectionCreating = false;
 // Active Celery collection processing tasks
 let activeCollectionTasks = [];
 let collectionTaskPollInterval = null;
+// Active report generation tasks
+let activeReportTasks = [];
+let reportTaskPollInterval = null;
 
 function mergeProcessingTasks(commessa, processing) {
     // Drop any previously tracked tasks for this commessa and replace with the
@@ -676,7 +680,7 @@ function mergeProcessingTasks(commessa, processing) {
         files_done: p.files_done ?? 0,
         files_total: p.files_total ?? 0,
     }));
-    updateCollectionProcessingBadge();
+    updateProcessingBadge();
     const hasInProgress = activeCollectionTasks.some(
         t => t.status === 'pending' || t.status === 'processing'
     );
@@ -691,11 +695,33 @@ async function restoreActiveCollectionTasks() {
         const tasks = data.tasks || [];
         if (tasks.length === 0) return;
         activeCollectionTasks = tasks;
-        updateCollectionProcessingBadge();
+        updateProcessingBadge();
         startCollectionPolling();
     } catch (e) {
         console.warn('Could not restore active collection tasks:', e);
     }
+}
+
+async function restoreActiveReportTasks() {
+    try {
+        const res = await fetch('/api/reports/active/');
+        if (!res.ok) return;
+        const data = await res.json();
+        const tasks = data.tasks || [];
+        if (tasks.length === 0) return;
+        activeReportTasks = tasks;
+        updateProcessingBadge();
+        startReportPolling();
+    } catch (e) {
+        console.warn('Could not restore active report tasks:', e);
+    }
+}
+
+function addReportTask(report) {
+    activeReportTasks = activeReportTasks.filter(r => r.id !== report.id);
+    activeReportTasks.push(report);
+    updateProcessingBadge();
+    startReportPolling();
 }
 // User is always authenticated on this page (protected by @login_required)
 let isLoggedIn = true;
@@ -2829,7 +2855,7 @@ async function createCollection(commessaCode, collectionName) {
                 files_done: 0,
                 files_total: (data.selected_files || []).length,
             });
-            updateCollectionProcessingBadge();
+            updateProcessingBadge();
             startCollectionPolling();
             if (data.warnings && data.warnings.length > 0) {
                 data.warnings.forEach(msg => showWarningBanner(msg));
@@ -3794,30 +3820,36 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// ── Collection processing badge & modal ───────────────────────────────────────
+// ── Processing badge & modal (collection + report tasks) ─────────────────────
 
-function updateCollectionProcessingBadge() {
+function updateProcessingBadge() {
     const badge = document.getElementById('processingBadge');
     if (!badge) return;
 
-    if (activeCollectionTasks.length === 0) {
+    const totalTasks = activeCollectionTasks.length + activeReportTasks.length;
+    if (totalTasks === 0) {
         badge.style.display = 'none';
         closeProcessingModal();
         return;
     }
 
-    const inProgress = activeCollectionTasks.filter(t => t.status === 'pending' || t.status === 'processing');
-    const withError = activeCollectionTasks.filter(t => t.status === 'error');
+    const collInProgress = activeCollectionTasks.filter(t => t.status === 'pending' || t.status === 'processing');
+    const collErr = activeCollectionTasks.filter(t => t.status === 'error');
+    const rptInProgress = activeReportTasks.filter(t => t.status === 'pending' || t.status === 'processing');
+    const rptErr = activeReportTasks.filter(t => t.status === 'error');
+
+    const inProgress = collInProgress.length + rptInProgress.length;
+    const withError = collErr.length + rptErr.length;
 
     badge.style.display = 'flex';
 
     const spinner = document.getElementById('processingSpinner');
     if (spinner) {
-        if (inProgress.length > 0) {
+        if (inProgress > 0) {
             spinner.className = 'processing-spinner';
             spinner.style.cssText = '';
             spinner.textContent = '';
-        } else if (withError.length > 0) {
+        } else if (withError > 0) {
             spinner.className = '';
             spinner.style.cssText = 'font-size:14px;line-height:1;flex-shrink:0;';
             spinner.textContent = '⚠️';
@@ -3829,29 +3861,30 @@ function updateCollectionProcessingBadge() {
     }
 
     const parts = [];
-    if (inProgress.length > 0) {
-        parts.push(inProgress.length === 1
-            ? '1 collection in elaborazione'
-            : `${inProgress.length} collection in elaborazione`);
+    if (inProgress > 0) {
+        parts.push(inProgress === 1 ? '1 task in elaborazione' : `${inProgress} task in elaborazione`);
     }
-    if (withError.length > 0) {
-        parts.push(withError.length === 1 ? '1 con errore' : `${withError.length} con errore`);
+    if (withError > 0) {
+        parts.push(withError === 1 ? '1 con errore' : `${withError} con errore`);
     }
-    if (inProgress.length === 0 && withError.length === 0) {
+    if (inProgress === 0 && withError === 0) {
         parts.push('Elaborazione completata');
     }
     document.getElementById('processingBadgeText').textContent = parts.join(', ');
 
     const processingModal = document.getElementById('processingModal');
     if (processingModal && processingModal.style.display === 'flex') {
-        renderCollectionProcessingModal();
+        renderProcessingModal();
     }
 }
+
+// Back-compat alias
+function updateCollectionProcessingBadge() { updateProcessingBadge(); }
 
 function openProcessingModal() {
     const modal = document.getElementById('processingModal');
     if (!modal) return;
-    renderCollectionProcessingModal();
+    renderProcessingModal();
     modal.style.display = 'flex';
 }
 
@@ -3860,48 +3893,72 @@ function closeProcessingModal() {
     if (modal) modal.style.display = 'none';
 }
 
-function renderCollectionProcessingModal() {
+function renderProcessingModal() {
     const body = document.getElementById('processingModalBody');
     if (!body) return;
 
-    if (!activeCollectionTasks || activeCollectionTasks.length === 0) {
-        body.innerHTML = '<p style="font-size:13px;color:var(--text-light);margin:0;">Nessuna collection in elaborazione.</p>';
+    const hasColl = activeCollectionTasks && activeCollectionTasks.length > 0;
+    const hasRpt = activeReportTasks && activeReportTasks.length > 0;
+
+    if (!hasColl && !hasRpt) {
+        body.innerHTML = '<p style="font-size:13px;color:var(--text-light);margin:0;">Nessun task in elaborazione.</p>';
         return;
     }
 
-    body.innerHTML = activeCollectionTasks.map(t => {
-        const isError = t.status === 'error';
-        const isReady = t.status === 'ready';
-        const label = t.collection_name.replace(/_/g, ' ');
-
+    const renderItem = (name, subtitle, progressText, isError, isReady) => {
         let statusEl;
         if (isError) {
             statusEl = `<span style="color:#e74c3c;font-size:12px;font-weight:500;">⚠ Errore</span>`;
         } else if (isReady) {
             statusEl = `<span style="color:#27ae60;font-size:12px;font-weight:500;">✓ Completato</span>`;
         } else {
-            const done = t.files_done ?? 0;
-            const total = t.files_total ?? 0;
-            const progress = total > 0 ? `${done}/${total} file` : 'In attesa...';
             statusEl = `<span style="color:var(--text-light);font-size:12px;display:flex;align-items:center;gap:6px;">
                 <div style="width:10px;height:10px;border:2px solid rgba(212,112,77,0.2);border-top:2px solid var(--accent-color);border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;"></div>
-                ${progress}
+                ${progressText}
             </span>`;
         }
-
         return `
             <div class="processing-item" style="${isError ? 'border-color:#e74c3c40;' : ''}">
-                <div style="display:flex;align-items:center;justify-content:space-between;">
-                    <div>
-                        <div class="processing-item-name">${escapeHtml(label)}</div>
-                        <div style="font-size:11px;color:var(--text-light);">${escapeHtml(t.commessa)}</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                    <div style="min-width:0;flex:1;">
+                        <div class="processing-item-name">${escapeHtml(name)}</div>
+                        <div style="font-size:11px;color:var(--text-light);">${escapeHtml(subtitle)}</div>
                     </div>
                     ${statusEl}
                 </div>
             </div>
         `;
-    }).join('');
+    };
+
+    let html = '';
+
+    if (hasColl) {
+        html += `<div style="font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin:4px 0 8px;">Collection</div>`;
+        html += activeCollectionTasks.map(t => {
+            const label = t.collection_name.replace(/_/g, ' ');
+            const done = t.files_done ?? 0;
+            const total = t.files_total ?? 0;
+            const progress = total > 0 ? `${done}/${total} file` : 'In attesa...';
+            return renderItem(label, t.commessa, progress, t.status === 'error', t.status === 'ready');
+        }).join('');
+    }
+
+    if (hasRpt) {
+        html += `<div style="font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin:${hasColl ? '16px' : '4px'} 0 8px;">Report</div>`;
+        html += activeReportTasks.map(t => {
+            const done = t.done_queries ?? 0;
+            const total = t.total_queries ?? 0;
+            const progress = total > 0 ? `${done}/${total} domande` : 'In attesa...';
+            const subtitle = `${t.commessa} · ${t.collection_name}`;
+            return renderItem(t.report_name, subtitle, progress, t.status === 'error', t.status === 'ready');
+        }).join('');
+    }
+
+    body.innerHTML = html;
 }
+
+// Back-compat alias
+function renderCollectionProcessingModal() { renderProcessingModal(); }
 
 function startCollectionPolling() {
     if (collectionTaskPollInterval) return;
@@ -3939,19 +3996,59 @@ async function pollCollectionTasks() {
         }
     }
 
-    updateCollectionProcessingBadge();
+    updateProcessingBadge();
 
     const allDone = activeCollectionTasks.every(t => t.status === 'ready' || t.status === 'error');
     if (allDone && activeCollectionTasks.length > 0) {
         stopCollectionPolling();
         const hasErrors = activeCollectionTasks.some(t => t.status === 'error');
         if (!hasErrors) {
-            // All completed successfully — reload after a brief pause
             setTimeout(() => {
                 activeCollectionTasks = [];
                 window.location.reload();
             }, 2000);
         }
-        // On errors: keep badge visible so user can see what failed
+    }
+}
+
+function startReportPolling() {
+    if (reportTaskPollInterval) return;
+    reportTaskPollInterval = setInterval(pollReportTasks, 2000);
+}
+
+function stopReportPolling() {
+    if (reportTaskPollInterval) {
+        clearInterval(reportTaskPollInterval);
+        reportTaskPollInterval = null;
+    }
+}
+
+async function pollReportTasks() {
+    const pending = activeReportTasks.filter(t => t.status === 'pending' || t.status === 'processing');
+    if (pending.length === 0) {
+        stopReportPolling();
+        return;
+    }
+
+    for (const task of pending) {
+        try {
+            const res = await fetch(`/api/reports/status/?id=${encodeURIComponent(task.id)}`);
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data.status && data.status !== task.status) task.status = data.status;
+            if (typeof data.done_queries === 'number') task.done_queries = data.done_queries;
+            if (typeof data.total_queries === 'number') task.total_queries = data.total_queries;
+        } catch (e) {
+            console.warn('Report poll error:', e);
+        }
+    }
+
+    updateProcessingBadge();
+
+    const allDone = activeReportTasks.every(t => t.status === 'ready' || t.status === 'error');
+    if (allDone && activeReportTasks.length > 0) {
+        stopReportPolling();
+        // Notify page-specific listeners
+        try { window.dispatchEvent(new CustomEvent('report-tasks-complete')); } catch (e) {}
     }
 }

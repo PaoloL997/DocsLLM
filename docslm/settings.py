@@ -103,7 +103,7 @@ LOGGING = {
             '()': 'django.utils.log.CallbackFilter',
             'callback': lambda record: all(
                 path not in record.getMessage()
-                for path in ['/api/collection-task-status/', '/api/collection-tasks/active/']
+                for path in ['/api/collection-task-status/', '/api/collection-tasks/active/', '/api/reports/status/']
             ),
         },
     },

@@ -100,6 +100,102 @@ def process_collection(collection_task_id: int) -> dict:
     return {'collection_task_id': collection_task_id, 'status': ct.status}
 
 
+@shared_task
+def generate_report_task(report_id: int) -> dict:
+    """Run all queries of a Report through the GraphRAG agent, saving Q/A + references.
+
+    A random user_id is generated so the agent refinement pipeline works
+    correctly. This also means Q/A pairs end up in Milvus ``memory`` and
+    are visible in Cronologia.
+
+    Args:
+        report_id: PK of the Report to process.
+
+    Returns:
+        Dict with ``report_id`` and final ``status``.
+    """
+    import uuid
+
+    from core.models import Report, ReportItem
+
+    try:
+        rpt = Report.objects.get(id=report_id)
+    except Report.DoesNotExist:
+        logger.error("Report %s non trovato", report_id)
+        return {'error': f'Report {report_id} non trovato'}
+
+    rpt.status = 'processing'
+    rpt.save(update_fields=['status'])
+
+    has_error = False
+
+    try:
+        config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+
+        from services.agent import Agent
+        from graphrag.store.store import Store
+
+        mode_cfg = Agent.MODES.get(rpt.mode, {})
+        k_value = mode_cfg.get('k', 5)
+
+        store = Store(
+            uri=config.get('uri'),
+            database=f"comm_{rpt.commessa}",
+            collection=rpt.collection_name,
+            k=k_value,
+            embedding_model=config.get('embedding_model'),
+        )
+        agent = Agent(store=store, mode=rpt.mode, rerank=True)
+
+        # user_id is used verbatim by graphRAG as the memory collection name.
+        # Match the pattern used in send_message: comm_{commessa}_{collection}_{uid}
+        user_id = f"comm_{rpt.commessa}_{rpt.collection_name}_report{rpt.id}{uuid.uuid4().hex[:6]}"
+
+        for item in rpt.items.order_by('order'):
+            try:
+                final_state = agent.invoke(item.query, user_id=user_id)
+                response = final_state.get('response', '')
+                if isinstance(response, dict):
+                    response = response.get('response', '') or str(response)
+                context = final_state.get('context') or []
+
+                references = []
+                for doc in context:
+                    meta = (
+                        doc.get('metadata', {})
+                        if isinstance(doc, dict)
+                        else (getattr(doc, 'metadata', {}) or {})
+                    ) or {}
+                    references.append({
+                        'name': meta.get('name') or meta.get('source') or meta.get('filename') or 'unknown',
+                        'page_start': meta.get('page_start'),
+                        'page_end': meta.get('page_end'),
+                    })
+
+                item.response = str(response)
+                item.references = references
+                item.save(update_fields=['response', 'references'])
+
+                from django.db.models import F
+                Report.objects.filter(id=rpt.id).update(done_queries=F('done_queries') + 1)
+
+            except Exception:
+                logger.exception("Errore processing query report %s item %s", rpt.id, item.id)
+                has_error = True
+
+    except Exception as exc:
+        logger.exception("Errore fatale nel Report %s", report_id)
+        rpt.error_message = str(exc)
+        rpt.save(update_fields=['error_message'])
+        has_error = True
+
+    rpt.status = 'error' if has_error else 'ready'
+    rpt.save(update_fields=['status'])
+    return {'report_id': report_id, 'status': rpt.status}
+
+
 def _update_collection_files(uri: str, db_name: str, collection_name: str, new_files: list) -> None:
     """Merge new_files into the Milvus collection's ``files`` property.
 

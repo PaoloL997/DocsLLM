@@ -29,6 +29,12 @@ def cronologia(request):
     return render(request, 'cronologia.html')
 
 
+@login_required
+def report(request):
+    """Render the report page."""
+    return render(request, 'report.html')
+
+
 @ensure_csrf_cookie
 def login_view(request):
     """Handle login page rendering and form submission.

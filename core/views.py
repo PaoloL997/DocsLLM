@@ -1,5 +1,5 @@
-from .utilities.auth import index, ricerca, cronologia, login_view, logout_view
-from .utilities.agents import send_message, initialize_agent, generate_report, download_report, AGENT_INSTANCES
+from .utilities.auth import index, ricerca, cronologia, report, login_view, logout_view
+from .utilities.agents import send_message, initialize_agent, AGENT_INSTANCES
 from .utilities.files import (
     check_path,
     list_job_files,
@@ -14,17 +14,23 @@ from .utilities.files import (
 from .utilities.search import search_commesse
 from .utilities.ricerca import initialize_search_store, search_documents
 from .utilities.cronologia import get_cronologia
+from .utilities.reports import (
+    create_report,
+    list_reports,
+    report_status,
+    active_report_tasks,
+    delete_report,
+)
 
 __all__ = [
     "index",
     "ricerca",
     "cronologia",
+    "report",
     "login_view",
     "logout_view",
     "send_message",
     "initialize_agent",
-    "generate_report",
-    "download_report",
     "AGENT_INSTANCES",
     "check_path",
     "list_job_files",
@@ -39,4 +45,9 @@ __all__ = [
     "initialize_search_store",
     "search_documents",
     "get_cronologia",
+    "create_report",
+    "list_reports",
+    "report_status",
+    "active_report_tasks",
+    "delete_report",
 ]
