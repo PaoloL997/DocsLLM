@@ -80,8 +80,25 @@ Trasforma la domanda dell'utente in una query ottimizzata per la ricerca vettori
 3. **Arricchimento e traduzione della query**
     - Mantieni la struttura originale e il linguaggio naturale della domanda.
     - Per ogni termine tecnico chiave, includi tra parentesi la traduzione o l'equivalente in inglese.
-    - Arricchisci la frase con 2-3 sinonimi o varianti tecniche pertinenti per migliorare il matching vettoriale.
-    - Esempio: "Qual è la portata nominale della pompa P-101?" diventa "Qual è la portata nominale (flow rate, rated flow) della pompa centrifuga (centrifugal pump) P-101, inclusi i valori di design e operativi?"
+    - Arricchisci la frase con 2-3 sinonimi o varianti tecniche pertinenti per migliorare il matching vettoriale. A tal proposito, per alcuni termini trovi un glossario di seguito con termini, sinonimi e abbreviazioni:
+        - Prova idraulica → hydrotest, hydrostatic test, pressure test | HT
+        - Controlli non distruttivi → non destructive examination/test | NDE, NDT, CND
+        - Magnetici → magnetoscopic, magnetic particle inspection/test, wet fluorescent magnetic test | MT, WFMT, MPI
+        - Liquidi penetranti → penetrant test, liquid penetrant test, dye penetrant test | PT, DYE
+        - Radiografie → radiographic test/examination, radiography, radiograph, volumetric inspection | RT, RX
+        - Ultrasuoni → ultrasonic test/examination, manual UT, volumetric inspection | UT
+        - Ultrasuoni registrati → automated ultrasonic examination, time of flight diffraction, phased array, recordable ultrasonic, volumetric inspection | AUT, PHA, PA, TOFD
+        - PMI → positive material identification, alloy identification | PMI
+        - Prova di tenuta → leak test, helium/pneumatic/air leak test, leak testing | LT
+        - Tolleranze dimensionali → dimensional check, dimensional tolerances | DC
+        - Ferrite → ferrite check/control/measurement/content | FCE
+        - Durezze → hardness test/check/verification | HB, HV, HBW
+        - Analisi chimica → chemical analysis/check/sampling | CA
+        - ITP → inspection and test plan, quality control plan, inspection/surveillance activity | ITP, QCP
+        - Notifiche → notification, inspection notification, shop test notification | STN, IN
+        - Controllo spessori → thickness check, zero point thickness, baseline thickness inspection | ZPT
+        - Book → manufacturing/manufacturer/quality data book, inspection book, final quality documentation, data report book, book index | MDB, QDB, MDRB, MRB
+        - Azotatura → nitrogen purging/filling/filled, dew point, vacuum cycle, drying
 4. **Requisiti di output**
     - Restituisci SOLO la query raffinata come una singola frase naturale.
     - NESSUNA etichetta come "Query raffinata:" o "Domanda autonoma:".

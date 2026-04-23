@@ -829,6 +829,7 @@ async function initializeAgent(commessa, collectionName) {
     try {
         // Show loading state
         showAgentLoading();
+        document.dispatchEvent(new CustomEvent('collectionLoading', { detail: { commessa, collection: collectionName } }));
         
         // Get selected mode from UI
         const modelSelected = document.querySelector('.model-selected');
@@ -2606,6 +2607,7 @@ async function initializeAgent(commessa, collectionName) {
     try {
         // Show loading state
         showAgentLoading();
+        document.dispatchEvent(new CustomEvent('collectionLoading', { detail: { commessa, collection: collectionName } }));
         
         // Get selected mode from UI
         const modelSelected = document.querySelector('.model-selected');

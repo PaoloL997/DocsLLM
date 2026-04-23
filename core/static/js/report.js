@@ -5,17 +5,29 @@
     let currentCommessa = null;
     let currentCollection = null;
     let currentReports = [];
+    let currentOpenReport = null;
+    let currentEditItem = null;
+    let currentEditArticle = null;
 
     const $ = (id) => document.getElementById(id);
 
     function showEmpty() {
         $('reportEmpty').style.display = '';
+        $('reportLoading').style.display = 'none';
+        $('reportFormSection').style.display = 'none';
+        $('reportList').style.display = 'none';
+    }
+
+    function showLoadingState() {
+        $('reportEmpty').style.display = 'none';
+        $('reportLoading').style.display = '';
         $('reportFormSection').style.display = 'none';
         $('reportList').style.display = 'none';
     }
 
     function showReady() {
         $('reportEmpty').style.display = 'none';
+        $('reportLoading').style.display = 'none';
         $('reportFormSection').style.display = '';
         $('reportList').style.display = '';
     }
@@ -150,34 +162,89 @@
                         <span>${escapeHtml(formatDate(r.created_at))}</span>
                     </div>
                 </div>
-                <button class="report-card-delete" data-id="${r.id}" title="Elimina report" aria-label="Elimina report">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
+                <div class="report-card-menu-wrap">
+                    <button class="report-qna-menu-btn" title="Opzioni" aria-label="Opzioni">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                            <circle cx="12" cy="5" r="1.5"></circle>
+                            <circle cx="12" cy="12" r="1.5"></circle>
+                            <circle cx="12" cy="19" r="1.5"></circle>
+                        </svg>
+                    </button>
+                    <div class="report-qna-dropdown">
+                        <button class="report-qna-dropdown-item" data-action="export">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Esporta Excel
+                        </button>
+                        <button class="report-qna-dropdown-item danger" data-action="delete">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                            Elimina
+                        </button>
+                    </div>
+                </div>
             `;
-            el.addEventListener('click', (e) => {
-                if (e.target.closest('.report-card-delete')) return;
-                openDetailModal(r);
+
+            // Only the main text area opens the detail modal
+            el.querySelector('.report-card-main').addEventListener('click', () => openDetailModal(r));
+
+            // 3-dot button: stop propagation so card click doesn't fire
+            const menuBtn = el.querySelector('.report-qna-menu-btn');
+            const wrap = el.querySelector('.report-card-menu-wrap');
+            const dropdown = el.querySelector('.report-qna-dropdown');
+
+            menuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const wasOpen = wrap.classList.contains('open');
+                closeCardMenus();
+                if (!wasOpen) {
+                    const rect = menuBtn.getBoundingClientRect();
+                    dropdown.style.top = `${rect.bottom + 4}px`;
+                    dropdown.style.left = `${Math.max(8, rect.right - 160)}px`;
+                    wrap.classList.add('open');
+                }
             });
+
+            // Dropdown actions
+            el.querySelectorAll('.report-card-menu-wrap .report-qna-dropdown-item').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    closeCardMenus();
+                    if (btn.dataset.action === 'delete') handleCardDelete(r.id);
+                    else if (btn.dataset.action === 'export') exportReport(r.id);
+                });
+            });
+
             frag.appendChild(el);
         });
         list.appendChild(frag);
+    }
 
-        list.querySelectorAll('.report-card-delete').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                if (!confirm('Eliminare definitivamente questo report?')) return;
-                try {
-                    const res = await fetch(
-                        `/api/reports/delete/?id=${encodeURIComponent(btn.dataset.id)}`,
-                        { method: 'DELETE', headers: { 'X-CSRFToken': getCookie('csrftoken') } }
-                    );
-                    if (!res.ok) throw new Error('delete failed');
-                    await refreshReports();
-                } catch {
-                    alert('Impossibile eliminare il report.');
-                }
-            });
+    function initCardMenuEvents() {
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.report-card-menu-wrap')) closeCardMenus();
         });
+    }
+
+    function closeCardMenus() {
+        document.querySelectorAll('.report-card-menu-wrap.open')
+            .forEach(w => w.classList.remove('open'));
+    }
+
+    async function handleCardDelete(reportId) {
+        if (!confirm('Eliminare definitivamente questo report?')) return;
+        try {
+            const res = await fetch(
+                `/api/reports/delete/?id=${encodeURIComponent(reportId)}`,
+                { method: 'DELETE', headers: { 'X-CSRFToken': getCookie('csrftoken') } }
+            );
+            if (!res.ok) throw new Error('delete failed');
+            await refreshReports();
+        } catch {
+            alert('Impossibile eliminare il report.');
+        }
+    }
+
+    function exportReport(reportId) {
+        window.location.href = `/api/reports/export/?id=${encodeURIComponent(reportId)}`;
     }
 
     // ── Detail modal (compact Q/A items) ─────────────────────────────────────
@@ -198,7 +265,26 @@
 
     function renderModalItem(it, idx) {
         return `
-            <article class="report-qna-item">
+            <article class="report-qna-item" data-item-id="${it.id}">
+                <div class="report-qna-menu-wrap">
+                    <button class="report-qna-menu-btn" title="Opzioni" aria-label="Opzioni">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                            <circle cx="12" cy="5" r="1.5"></circle>
+                            <circle cx="12" cy="12" r="1.5"></circle>
+                            <circle cx="12" cy="19" r="1.5"></circle>
+                        </svg>
+                    </button>
+                    <div class="report-qna-dropdown">
+                        <button class="report-qna-dropdown-item" data-action="edit">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            Modifica
+                        </button>
+                        <button class="report-qna-dropdown-item danger" data-action="delete">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                            Elimina
+                        </button>
+                    </div>
+                </div>
                 <div class="report-qna-header">
                     <span class="report-qna-num">${idx + 1}</span>
                     <p class="report-qna-q">${escapeHtml(it.query || '')}</p>
@@ -209,7 +295,8 @@
         `;
     }
 
-    function openDetailModal(rpt) {
+    async function openDetailModal(rpt) {
+        currentOpenReport = rpt;
         const modal = $('reportModal');
         const meta = $('reportModalMeta');
         const body = $('reportModalBody');
@@ -219,29 +306,177 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 ${escapeHtml(rpt.report_name)}
             </span>
-            <span class="cronologia-card-user">
+            <span class="cronologia-card-user" id="reportModalQueryCount">
                 ${escapeHtml(rpt.mode)} · ${rpt.total_queries} domande · ${escapeHtml(formatDate(rpt.created_at))}
             </span>
         `;
+
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
 
         if (rpt.status === 'error') {
             body.innerHTML = `<p class="report-modal-status report-modal-status-error">
                 Il report è terminato con errore. ${escapeHtml(rpt.error_message || '')}
             </p>`;
-        } else if (rpt.status !== 'ready') {
+            return;
+        }
+        if (rpt.status !== 'ready') {
             body.innerHTML = `<p class="report-modal-status">
                 Report in elaborazione: ${rpt.done_queries}/${rpt.total_queries} domande completate.
             </p>`;
-        } else {
-            body.innerHTML = (rpt.items || []).map(renderModalItem).join('');
+            return;
         }
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+
+        // Lazy-load items if not already cached
+        if (!rpt.items) {
+            body.innerHTML = `<p class="report-modal-status">Caricamento…</p>`;
+            try {
+                const res = await fetch(`/api/reports/status/?id=${encodeURIComponent(rpt.id)}&items=1`);
+                const data = await res.json();
+                rpt.items = data.items || [];
+                // Update cached reference in currentReports
+                const idx = currentReports.findIndex(r => r.id === rpt.id);
+                if (idx !== -1) currentReports[idx].items = rpt.items;
+            } catch {
+                body.innerHTML = `<p class="report-modal-status report-modal-status-error">Errore nel caricamento degli item.</p>`;
+                return;
+            }
+        }
+
+        body.innerHTML = (rpt.items || []).map(renderModalItem).join('');
+        initModalBodyEvents(body);
     }
 
     function closeDetailModal() {
         $('reportModal').style.display = 'none';
         document.body.style.overflow = '';
+        currentOpenReport = null;
+        closeAllMenus();
+    }
+
+    // ── Item menu / dropdown ──────────────────────────────────────────────────
+    function closeAllMenus() {
+        document.querySelectorAll('.report-qna-menu-wrap.open')
+            .forEach(w => w.classList.remove('open'));
+    }
+
+    function initModalBodyEvents(body) {
+        body.addEventListener('click', (e) => {
+            const menuBtn = e.target.closest('.report-qna-menu-btn');
+            if (menuBtn) {
+                e.stopPropagation();
+                const wrap = menuBtn.closest('.report-qna-menu-wrap');
+                const wasOpen = wrap.classList.contains('open');
+                closeAllMenus();
+                if (!wasOpen) {
+                    const dropdown = wrap.querySelector('.report-qna-dropdown');
+                    const rect = menuBtn.getBoundingClientRect();
+                    dropdown.style.top = `${rect.bottom + 4}px`;
+                    // right-align dropdown with the button
+                    const dropW = 140;
+                    dropdown.style.left = `${Math.max(8, rect.right - dropW)}px`;
+                    wrap.classList.add('open');
+                }
+                return;
+            }
+
+            const actionBtn = e.target.closest('.report-qna-dropdown-item');
+            if (actionBtn) {
+                const action = actionBtn.dataset.action;
+                const article = actionBtn.closest('.report-qna-item');
+                const itemId = article?.dataset.itemId;
+                closeAllMenus();
+                if (action === 'delete') {
+                    handleDeleteItem(itemId, article);
+                } else if (action === 'edit') {
+                    const item = (currentOpenReport?.items || [])
+                        .find(it => String(it.id) === String(itemId));
+                    if (item) openItemEditModal(item, article);
+                }
+                return;
+            }
+
+            if (!e.target.closest('.report-qna-menu-wrap')) {
+                closeAllMenus();
+            }
+        });
+    }
+
+    // ── Delete item ───────────────────────────────────────────────────────────
+    async function handleDeleteItem(itemId, articleEl) {
+        if (!confirm('Eliminare questa domanda dal report?')) return;
+        try {
+            const res = await fetch(
+                `/api/reports/item/delete/?id=${encodeURIComponent(itemId)}`,
+                { method: 'DELETE', headers: { 'X-CSRFToken': getCookie('csrftoken') } }
+            );
+            if (!res.ok) throw new Error('delete failed');
+
+            if (currentOpenReport?.items) {
+                currentOpenReport.items = currentOpenReport.items
+                    .filter(it => String(it.id) !== String(itemId));
+                currentOpenReport.total_queries = currentOpenReport.items.length;
+            }
+            articleEl?.remove();
+
+            const countEl = $('reportModalQueryCount');
+            if (countEl && currentOpenReport) {
+                countEl.textContent = `${currentOpenReport.mode} · ${currentOpenReport.total_queries} domande · ${formatDate(currentOpenReport.created_at)}`;
+            }
+        } catch {
+            alert('Impossibile eliminare la domanda.');
+        }
+    }
+
+    // ── Edit item modal ───────────────────────────────────────────────────────
+    function openItemEditModal(item, articleEl) {
+        currentEditItem = item;
+        currentEditArticle = articleEl;
+        $('reportItemEditQuery').value = item.query || '';
+        $('reportItemEditResponse').value = item.response || '';
+        $('reportItemEditModal').style.display = 'flex';
+    }
+
+    function closeItemEditModal() {
+        $('reportItemEditModal').style.display = 'none';
+        currentEditItem = null;
+        currentEditArticle = null;
+    }
+
+    async function saveItemEdit() {
+        if (!currentEditItem) return;
+        const query = $('reportItemEditQuery').value.trim();
+        const response = $('reportItemEditResponse').value.trim();
+
+        const saveBtn = $('reportItemEditSave');
+        saveBtn.disabled = true;
+
+        try {
+            const res = await fetch('/api/reports/item/update/', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ id: currentEditItem.id, query, response }),
+            });
+            if (!res.ok) throw new Error('update failed');
+
+            currentEditItem.query = query;
+            currentEditItem.response = response;
+
+            if (currentEditArticle) {
+                const qEl = currentEditArticle.querySelector('.report-qna-q');
+                const aEl = currentEditArticle.querySelector('.report-qna-a');
+                if (qEl) qEl.textContent = query;
+                if (aEl) aEl.innerHTML = renderMarkdown(response || '—');
+            }
+            closeItemEditModal();
+        } catch {
+            alert('Impossibile salvare le modifiche.');
+        } finally {
+            saveBtn.disabled = false;
+        }
     }
 
     // ── List / polling ────────────────────────────────────────────────────────
@@ -377,11 +612,21 @@
         $('reportForm').addEventListener('submit', submitReport);
         $('reportModalClose').addEventListener('click', closeDetailModal);
         $('reportModalBackdrop').addEventListener('click', closeDetailModal);
+        $('reportItemEditClose').addEventListener('click', closeItemEditModal);
+        $('reportItemEditCancel').addEventListener('click', closeItemEditModal);
+        $('reportItemEditSave').addEventListener('click', saveItemEdit);
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeDetailModal();
+            if (e.key === 'Escape') {
+                if ($('reportItemEditModal').style.display !== 'none') {
+                    closeItemEditModal();
+                } else {
+                    closeDetailModal();
+                }
+            }
         });
 
         initModeDropdown();
+        initCardMenuEvents();
 
         $('reportNameInput').addEventListener('input', updateSubmitState);
 
@@ -397,6 +642,10 @@
                 lbl.classList.remove('has-file');
             }
             updateSubmitState();
+        });
+
+        document.addEventListener('collectionLoading', () => {
+            showLoadingState();
         });
 
         document.addEventListener('collectionSelected', async (e) => {

@@ -20,6 +20,9 @@ from .utilities.reports import (
     report_status,
     active_report_tasks,
     delete_report,
+    delete_report_item,
+    update_report_item,
+    export_report,
 )
 
 __all__ = [
@@ -50,4 +53,7 @@ __all__ = [
     "report_status",
     "active_report_tasks",
     "delete_report",
+    "delete_report_item",
+    "update_report_item",
+    "export_report",
 ]

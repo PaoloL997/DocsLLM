@@ -111,28 +111,31 @@ def list_reports(request):
     reports = (
         Report.objects
         .filter(commessa=commessa, collection_name=collection)
-        .prefetch_related('items')
         .order_by('-created_at')
     )
     return JsonResponse({
-        'reports': [_serialize_report(r, include_items=True) for r in reports],
+        'reports': [_serialize_report(r) for r in reports],
     })
 
 
 def report_status(request):
-    """GET param: id — return the current progress/status of a Report."""
+    """GET param: id — return the current progress/status of a Report.
+
+    Pass ``items=1`` to include Q/A items in the response.
+    """
     rid = request.GET.get('id')
     if not rid:
         return JsonResponse({'error': 'id richiesto'}, status=400)
 
     from core.models import Report
 
+    include_items = request.GET.get('items') == '1'
     try:
-        rpt = Report.objects.get(id=rid)
+        rpt = Report.objects.prefetch_related('items').get(id=rid) if include_items else Report.objects.get(id=rid)
     except Report.DoesNotExist:
         return JsonResponse({'status': 'none'})
 
-    return JsonResponse(_serialize_report(rpt))
+    return JsonResponse(_serialize_report(rpt, include_items=include_items))
 
 
 def active_report_tasks(request):
@@ -169,6 +172,68 @@ def delete_report(request):
     return JsonResponse({'success': True})
 
 
+def export_report(request):
+    """Export a ready Report as an .xlsx file.
+
+    Args:
+        request: GET with ``id`` query param.
+
+    Returns:
+        An xlsx file download response.
+    """
+    rid = request.GET.get('id')
+    if not rid:
+        return JsonResponse({'error': 'id richiesto'}, status=400)
+
+    from core.models import Report
+
+    try:
+        rpt = Report.objects.prefetch_related('items').get(id=rid)
+    except Report.DoesNotExist:
+        return JsonResponse({'error': 'Report non trovato'}, status=404)
+
+    from django.http import HttpResponse
+
+    def _fmt_refs(refs: list) -> str:
+        if not refs:
+            return ''
+        parts = []
+        for r in refs:
+            name = r.get('name', 'unknown')
+            p_start = r.get('page_start')
+            p_end = r.get('page_end')
+            if p_start is not None and p_end is not None and p_start != p_end:
+                parts.append(f"{name} · pp. {p_start}-{p_end}")
+            elif p_start is not None:
+                parts.append(f"{name} · p. {p_start}")
+            else:
+                parts.append(name)
+        return '\n'.join(parts)
+
+    rows = [
+        {
+            '#': item.order + 1,
+            'Domanda': item.query,
+            'Risposta': item.response,
+            'Fonti': _fmt_refs(item.references or []),
+        }
+        for item in rpt.items.all()
+    ]
+    df = pd.DataFrame(rows, columns=['#', 'Domanda', 'Risposta', 'Fonti'])
+
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False)
+    buf.seek(0)
+
+    safe_name = rpt.report_name.replace('"', '_')
+    response = HttpResponse(
+        buf.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{safe_name}.xlsx"'
+    return response
+
+
 def _serialize_report(rpt, include_items: bool = False) -> dict:
     """Serialize a Report for JSON output.
 
@@ -192,6 +257,7 @@ def _serialize_report(rpt, include_items: bool = False) -> dict:
     if include_items:
         data['items'] = [
             {
+                'id': it.id,
                 'order': it.order,
                 'query': it.query,
                 'response': it.response,
@@ -200,3 +266,83 @@ def _serialize_report(rpt, include_items: bool = False) -> dict:
             for it in rpt.items.all()
         ]
     return data
+
+
+@require_http_methods(['DELETE', 'POST'])
+def delete_report_item(request):
+    """Delete a single ReportItem by id.
+
+    Args:
+        request: DELETE with ``id`` as query param, or POST with JSON ``id``.
+
+    Returns:
+        JSON success or error.
+    """
+    item_id = None
+    if request.method == 'DELETE':
+        item_id = request.GET.get('id')
+    else:
+        try:
+            data = json.loads(request.body or '{}')
+        except json.JSONDecodeError:
+            data = {}
+        item_id = data.get('id') or request.POST.get('id')
+
+    if not item_id:
+        return JsonResponse({'error': 'id richiesto'}, status=400)
+
+    from core.models import ReportItem
+
+    deleted, _ = ReportItem.objects.filter(id=item_id).delete()
+    if not deleted:
+        return JsonResponse({'error': 'Item non trovato'}, status=404)
+    return JsonResponse({'success': True})
+
+
+@require_http_methods(['PATCH', 'POST'])
+def update_report_item(request):
+    """Update the query and/or response of a ReportItem.
+
+    Args:
+        request: PATCH/POST with JSON body containing ``id``, and optionally
+            ``query`` and ``response``.
+
+    Returns:
+        JSON with the updated item fields.
+    """
+    try:
+        data = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON non valido'}, status=400)
+
+    item_id = data.get('id')
+    if not item_id:
+        return JsonResponse({'error': 'id richiesto'}, status=400)
+
+    from core.models import ReportItem
+
+    try:
+        item = ReportItem.objects.get(id=item_id)
+    except ReportItem.DoesNotExist:
+        return JsonResponse({'error': 'Item non trovato'}, status=404)
+
+    update_fields = []
+    if 'query' in data:
+        item.query = str(data['query']).strip()
+        update_fields.append('query')
+    if 'response' in data:
+        item.response = str(data['response']).strip()
+        update_fields.append('response')
+
+    if update_fields:
+        item.save(update_fields=update_fields)
+
+    return JsonResponse({
+        'success': True,
+        'item': {
+            'id': item.id,
+            'order': item.order,
+            'query': item.query,
+            'response': item.response,
+        },
+    })

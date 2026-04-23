@@ -30,4 +30,7 @@ urlpatterns = [
     path('api/reports/status/', views.report_status, name='report_status'),
     path('api/reports/active/', views.active_report_tasks, name='active_report_tasks'),
     path('api/reports/delete/', views.delete_report, name='delete_report'),
+    path('api/reports/item/delete/', views.delete_report_item, name='delete_report_item'),
+    path('api/reports/item/update/', views.update_report_item, name='update_report_item'),
+    path('api/reports/export/', views.export_report, name='export_report'),
 ]

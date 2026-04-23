@@ -81,6 +81,15 @@
                     <p>Seleziona una commessa ed un notebook nella barra laterale per gestire i report.</p>
                 </div>
 
+                <!-- Loading state (agent initializing) -->
+                <div id="reportLoading" class="report-empty" style="display:none;">
+                    <svg class="spinner-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" opacity="0.25"></circle>
+                        <path d="M12 2 A10 10 0 0 1 22 12" stroke-linecap="round"></path>
+                    </svg>
+                    <p>Caricamento notebook…</p>
+                </div>
+
                 <!-- Upload form (chat-card style) -->
                 <section id="reportFormSection" class="report-form-section" style="display:none;">
                     <form id="reportForm" class="chat-card report-card-form" autocomplete="off">
@@ -164,8 +173,30 @@
         </div>
     </div>
 
+    <!-- Report item edit modal -->
+    <div class="report-item-edit-overlay" id="reportItemEditModal" style="display:none;">
+        <div class="report-item-edit-dialog" role="dialog" aria-modal="true">
+            <header class="report-item-edit-head">
+                <span class="report-item-edit-title">Modifica domanda</span>
+                <button class="cronologia-modal-close" id="reportItemEditClose" title="Chiudi">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </header>
+            <div class="report-item-edit-body">
+                <label class="report-item-edit-label" for="reportItemEditQuery">Domanda</label>
+                <textarea id="reportItemEditQuery" class="report-item-edit-textarea" rows="3"></textarea>
+                <label class="report-item-edit-label" for="reportItemEditResponse">Risposta</label>
+                <textarea id="reportItemEditResponse" class="report-item-edit-textarea report-item-edit-response" rows="8"></textarea>
+            </div>
+            <footer class="report-item-edit-footer">
+                <button class="report-item-edit-btn-cancel" id="reportItemEditCancel">Annulla</button>
+                <button class="report-item-edit-btn-save" id="reportItemEditSave">Salva</button>
+            </footer>
+        </div>
+    </div>
+
     <script src="{% static 'js/app.js' %}"></script>
-    <script src="{% static 'js/report.js' %}?v=4"></script>
+    <script src="{% static 'js/report.js' %}?v=12"></script>
 
     <!-- Processing badge (bottom-right) -->
     <div id="processingBadge" class="processing-badge" style="display:none;" onclick="openProcessingModal()">
