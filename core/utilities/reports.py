@@ -346,3 +346,49 @@ def update_report_item(request):
             'response': item.response,
         },
     })
+
+
+@require_http_methods(['POST'])
+def cancel_report(request):
+    """Revoke a running Report task and delete the Report record.
+
+    Steps:
+      1. Mark the Report status as 'cancelled' so the Celery worker exits
+         its per-query loop cooperatively.
+      2. Revoke the Celery task with terminate=True as a hard stop.
+      3. Delete the Report (cascading ReportItem rows) so the report_name
+         slot is free for a retry.
+
+    Args:
+        request: POST with JSON body ``{"id": <report_pk>}``.
+
+    Returns:
+        JSON success/error.
+    """
+    try:
+        data = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        data = {}
+    rid = data.get('id') or request.POST.get('id')
+    if not rid:
+        return JsonResponse({'error': 'id richiesto'}, status=400)
+
+    from core.models import Report
+
+    try:
+        rpt = Report.objects.get(id=rid)
+    except Report.DoesNotExist:
+        return JsonResponse({'error': 'Report non trovato'}, status=404)
+
+    rpt.status = 'cancelled'
+    rpt.save(update_fields=['status'])
+
+    if rpt.task_id:
+        try:
+            from docslm.celery import app as celery_app
+            celery_app.control.revoke(rpt.task_id, terminate=True, signal='SIGTERM')
+        except Exception:
+            logger.exception("Impossibile revocare il task Celery %s", rpt.task_id)
+
+    rpt.delete()
+    return JsonResponse({'success': True})

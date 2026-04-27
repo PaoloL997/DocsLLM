@@ -35,7 +35,11 @@ def main():
     manage = os.path.join(base, "manage.py")
 
     django_cmd = [python, manage, "runserver", f"0.0.0.0:{args.port}"]
-    celery_cmd = [python, "-m", "celery", "-A", "docslm", "worker", "--loglevel=info", "--pool=solo"]
+    celery_cmd = [
+        python, "-m", "celery", "-A", "docslm", "worker",
+        "--loglevel=info", "--pool=solo",
+        "-n", "docslm@%h", "-Q", "docslm",
+    ]
 
     processes = []
 

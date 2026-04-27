@@ -24,6 +24,7 @@ class CollectionTask(models.Model):
         ('processing', 'In elaborazione'),
         ('ready', 'Pronto'),
         ('error', 'Errore'),
+        ('cancelled', 'Annullato'),
     ]
 
     commessa = models.CharField(max_length=200)
@@ -55,6 +56,7 @@ class Report(models.Model):
         ('processing', 'In elaborazione'),
         ('ready', 'Pronto'),
         ('error', 'Errore'),
+        ('cancelled', 'Annullato'),
     ]
 
     MODE_CHOICES = [

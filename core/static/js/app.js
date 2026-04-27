@@ -4072,7 +4072,7 @@ function renderProcessingModal() {
         return;
     }
 
-    const renderItem = (name, subtitle, progressText, isError, isReady) => {
+    const renderItem = (name, subtitle, progressText, isError, isReady, cancelHandler) => {
         let statusEl;
         if (isError) {
             statusEl = `<span style="color:#e74c3c;font-size:12px;font-weight:500;">⚠ Errore</span>`;
@@ -4084,6 +4084,13 @@ function renderProcessingModal() {
                 ${progressText}
             </span>`;
         }
+        const canCancel = !isReady && cancelHandler;
+        const cancelBtn = canCancel
+            ? `<button type="button" title="Annulla" onclick="${cancelHandler}"
+                style="margin-left:8px;background:transparent;border:1px solid var(--border-color);color:var(--text-light);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;flex-shrink:0;">
+                Annulla
+            </button>`
+            : '';
         return `
             <div class="processing-item" style="${isError ? 'border-color:#e74c3c40;' : ''}">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
@@ -4091,7 +4098,10 @@ function renderProcessingModal() {
                         <div class="processing-item-name">${escapeHtml(name)}</div>
                         <div style="font-size:11px;color:var(--text-light);">${escapeHtml(subtitle)}</div>
                     </div>
-                    ${statusEl}
+                    <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+                        ${statusEl}
+                        ${cancelBtn}
+                    </div>
                 </div>
             </div>
         `;
@@ -4106,7 +4116,7 @@ function renderProcessingModal() {
             const done = t.files_done ?? 0;
             const total = t.files_total ?? 0;
             const progress = total > 0 ? `${done}/${total} file` : 'In attesa...';
-            return renderItem(label, t.commessa, progress, t.status === 'error', t.status === 'ready');
+            return renderItem(label, t.commessa, progress, t.status === 'error', t.status === 'ready', `cancelCollectionTask(${t.id})`);
         }).join('');
     }
 
@@ -4117,7 +4127,7 @@ function renderProcessingModal() {
             const total = t.total_queries ?? 0;
             const progress = total > 0 ? `${done}/${total} domande` : 'In attesa...';
             const subtitle = `${t.commessa} · ${t.collection_name}`;
-            return renderItem(t.report_name, subtitle, progress, t.status === 'error', t.status === 'ready');
+            return renderItem(t.report_name, subtitle, progress, t.status === 'error', t.status === 'ready', `cancelReportTask(${t.id})`);
         }).join('');
     }
 
@@ -4153,6 +4163,10 @@ async function pollCollectionTasks() {
             );
             if (!res.ok) continue;
             const data = await res.json();
+            if (data.status === 'none' || data.status === 'cancelled') {
+                task._drop = true;
+                continue;
+            }
             if (data.status && data.status !== task.status) {
                 task.status = data.status;
             }
@@ -4163,6 +4177,7 @@ async function pollCollectionTasks() {
         }
     }
 
+    activeCollectionTasks = activeCollectionTasks.filter(t => !t._drop);
     updateProcessingBadge();
 
     const allDone = activeCollectionTasks.every(t => t.status === 'ready' || t.status === 'error');
@@ -4202,6 +4217,10 @@ async function pollReportTasks() {
             const res = await fetch(`/api/reports/status/?id=${encodeURIComponent(task.id)}`);
             if (!res.ok) continue;
             const data = await res.json();
+            if (data.status === 'none' || data.status === 'cancelled') {
+                task._drop = true;
+                continue;
+            }
             if (data.status && data.status !== task.status) task.status = data.status;
             if (typeof data.done_queries === 'number') task.done_queries = data.done_queries;
             if (typeof data.total_queries === 'number') task.total_queries = data.total_queries;
@@ -4210,6 +4229,7 @@ async function pollReportTasks() {
         }
     }
 
+    activeReportTasks = activeReportTasks.filter(t => !t._drop);
     updateProcessingBadge();
 
     const allDone = activeReportTasks.every(t => t.status === 'ready' || t.status === 'error');
@@ -4217,5 +4237,59 @@ async function pollReportTasks() {
         stopReportPolling();
         // Notify page-specific listeners
         try { window.dispatchEvent(new CustomEvent('report-tasks-complete')); } catch (e) {}
+    }
+}
+
+async function cancelCollectionTask(taskId) {
+    if (!confirm("Annullare l'elaborazione di questa collection? La collection parziale verrà eliminata.")) return;
+    try {
+        const res = await fetch('/api/collection-tasks/cancel/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ id: taskId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            alert(data.error || 'Impossibile annullare il task.');
+            return;
+        }
+        activeCollectionTasks = activeCollectionTasks.filter(t => t.id !== taskId);
+        updateProcessingBadge();
+        if (activeCollectionTasks.length === 0) stopCollectionPolling();
+        if (typeof selectedCommessa !== 'undefined' && selectedCommessa && typeof loadCollections === 'function') {
+            try { loadCollections(selectedCommessa); } catch (e) {}
+        }
+    } catch (e) {
+        console.warn('Cancel collection error:', e);
+        alert('Errore di rete durante l\'annullamento.');
+    }
+}
+
+async function cancelReportTask(reportId) {
+    if (!confirm("Annullare la generazione di questo report? Il report verrà eliminato.")) return;
+    try {
+        const res = await fetch('/api/reports/cancel/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({ id: reportId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            alert(data.error || 'Impossibile annullare il report.');
+            return;
+        }
+        activeReportTasks = activeReportTasks.filter(t => t.id !== reportId);
+        updateProcessingBadge();
+        if (activeReportTasks.length === 0) stopReportPolling();
+        try { window.dispatchEvent(new CustomEvent('report-tasks-complete')); } catch (e) {}
+    } catch (e) {
+        console.warn('Cancel report error:', e);
+        alert('Errore di rete durante l\'annullamento.');
     }
 }

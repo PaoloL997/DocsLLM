@@ -783,3 +783,74 @@ def delete_collection(request):
         return JsonResponse({'error': str(exc)}, status=500)
     except Exception as exc:
         return JsonResponse({'error': str(exc)}, status=500)
+
+def cancel_collection_task(request):
+    """POST JSON: { id } — revoke a running CollectionTask and clean up.
+
+    Steps:
+      1. Mark the task as 'cancelled' so the Celery worker can exit its loop.
+      2. Revoke the Celery task with terminate=True as a hard stop.
+      3. Drop the Milvus collection (it was created empty synchronously).
+      4. Delete the CollectionTask record so the slot is free for retry.
+
+    Args:
+        request: POST with JSON body ``{"id": <task_pk>}``.
+
+    Returns:
+        JSON success payload with the cancelled commessa/collection.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        data = {}
+    task_pk = data.get('id')
+    if not task_pk:
+        return JsonResponse({'error': 'id richiesto'}, status=400)
+
+    from core.models import CollectionTask
+
+    try:
+        ct = CollectionTask.objects.get(id=task_pk)
+    except CollectionTask.DoesNotExist:
+        return JsonResponse({'error': 'Task non trovato'}, status=404)
+
+    ct.status = 'cancelled'
+    ct.save(update_fields=['status'])
+
+    if ct.task_id:
+        try:
+            from docslm.celery import app as celery_app
+            celery_app.control.revoke(ct.task_id, terminate=True, signal='SIGTERM')
+        except Exception:
+            logger.exception("Impossibile revocare il task Celery %s", ct.task_id)
+
+    try:
+        from pymilvus import Collection, db as milvus_db
+        config = _load_config()
+        uri = config.get('uri')
+        if uri:
+            _connect_milvus(uri)
+            milvus_db.using_database(f"comm_{ct.commessa}")
+            try:
+                Collection(ct.collection_name).drop()
+            except Exception:
+                logger.warning(
+                    "Collection %s non droppata (forse già assente)",
+                    ct.collection_name,
+                    exc_info=True,
+                )
+    except Exception:
+        logger.exception("Errore durante il drop della collection %s", ct.collection_name)
+
+    commessa = ct.commessa
+    collection_name = ct.collection_name
+    ct.delete()
+
+    return JsonResponse({
+        'success': True,
+        'commessa': commessa,
+        'collection_name': collection_name,
+    })

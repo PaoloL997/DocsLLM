@@ -11,6 +11,7 @@ from .utilities.files import (
     active_collection_tasks,
     delete_collection_file,
     delete_collection,
+    cancel_collection_task,
 )
 from .utilities.search import search_commesse
 from .utilities.ricerca import initialize_search_store, search_documents
@@ -24,6 +25,7 @@ from .utilities.reports import (
     delete_report_item,
     update_report_item,
     export_report,
+    cancel_report,
 )
 
 __all__ = [
@@ -46,6 +48,7 @@ __all__ = [
     "active_collection_tasks",
     "delete_collection_file",
     "delete_collection",
+    "cancel_collection_task",
     "search_commesse",
     "initialize_search_store",
     "search_documents",
@@ -58,4 +61,5 @@ __all__ = [
     "delete_report_item",
     "update_report_item",
     "export_report",
+    "cancel_report",
 ]
