@@ -244,7 +244,6 @@ function setupEventListeners() {
         deleteAllDocsBtn.addEventListener('click', async () => {
             const modalTitle = document.getElementById('modalCollectionTitle');
             const collectionName = modalTitle.textContent.replace('Notebook: ', '');
-            
             // Get commessa from current context (from the sidebar or a data attribute)
             // We need to find the current commessa - let's use a different approach
             // by passing it through a data attribute on the modal
@@ -295,6 +294,32 @@ function setupEventListeners() {
             }
         });
     }
+
+    const addFilesToCollectionBtn = document.getElementById('addFilesToCollectionBtn');
+    console.log('[addFiles] btn lookup:', !!addFilesToCollectionBtn);
+    // Event delegation: also catches clicks on inner SVG/path
+    document.addEventListener('click', (ev) => {
+        const btn = ev.target.closest && ev.target.closest('#addFilesToCollectionBtn');
+        if (!btn) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        console.log('[addFiles] click fired (delegated)');
+        const modal = document.getElementById('collectionModal');
+        if (!modal) return;
+        const commessa = modal.getAttribute('data-commessa');
+        const collection = modal.getAttribute('data-collection');
+        console.log('[addFiles] commessa/collection:', commessa, collection);
+        if (!commessa || !collection) {
+            console.error('Commessa or collection not found');
+            return;
+        }
+        modal.classList.remove('open');
+        if (typeof openAddFilesModal !== 'function') {
+            console.error('[addFiles] openAddFilesModal is not defined');
+            return;
+        }
+        openAddFilesModal(commessa, collection);
+    });
 
     window.addEventListener('click', (e) => {
         if (isProcessing || isCollectionCreating) return;
@@ -661,6 +686,9 @@ let activeCollection = null;
 let isProcessing = false;
 // Flag to lock the create-collection modal while the creation request is in flight
 let isCollectionCreating = false;
+// Add-files-to-existing-collection mode for the create modal
+let isAddFilesMode = false;
+let addFilesCollectionName = null;
 // Active Celery collection processing tasks
 let activeCollectionTasks = [];
 let collectionTaskPollInterval = null;
@@ -2677,7 +2705,7 @@ function submitCreateCollection() {
         return;
     }
 
-    const rawName = input.value.trim();
+    const rawName = isAddFilesMode ? (addFilesCollectionName || '') : input.value.trim();
     if (!rawName) {
         console.log('Empty collection name');
         return;
@@ -2689,7 +2717,14 @@ function submitCreateCollection() {
         return;
     }
 
-    input.value = sanitizedName;
+    if (!isAddFilesMode) {
+        input.value = sanitizedName;
+    }
+
+    if (isAddFilesMode && (!modalSelectedFiles || modalSelectedFiles.length === 0)) {
+        alert('Seleziona almeno un file da aggiungere');
+        return;
+    }
 
     // Immediately show loading state and disable inputs
     if (input) {
@@ -2697,7 +2732,7 @@ function submitCreateCollection() {
         input.style.opacity = '0.6';
         input.style.cursor = 'not-allowed';
     }
-    
+
     if (confirmBtn) {
         confirmBtn.disabled = true;
         confirmBtn.style.opacity = '0.6';
@@ -2710,7 +2745,7 @@ function submitCreateCollection() {
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:60px 40px;height:100%;">
                 <div style="width:48px;height:48px;border:4px solid rgba(212, 112, 77, 0.2);border-top:4px solid var(--accent-color);border-radius:50%;animation:spin 1s linear infinite;"></div>
                 <div style="text-align:center;">
-                    <div style="font-size:16px;font-weight:600;color:var(--text-color);margin-bottom:8px;">Creazione in corso...</div>
+                    <div style="font-size:16px;font-weight:600;color:var(--text-color);margin-bottom:8px;">${isAddFilesMode ? 'Aggiunta in corso...' : 'Creazione in corso...'}</div>
                     <div style="font-size:13px;color:var(--text-light);">Processing documenti e creazione collection</div>
                 </div>
             </div>
@@ -2722,22 +2757,24 @@ function submitCreateCollection() {
         `;
     }
 
-    // Call createCollection without finally() - let it handle button state
-    createCollection(currentCommessaCode, sanitizedName)
-        .catch((error) => {
-            console.error('Error creating collection:', error);
-            if (input) {
-                input.disabled = false;
-                input.style.opacity = '1';
-                input.style.cursor = 'text';
-            }
-            if (confirmBtn) {
-                confirmBtn.disabled = false;
-                confirmBtn.style.opacity = '1';
-                confirmBtn.style.cursor = 'pointer';
-                confirmBtn.textContent = 'Crea';
-            }
-        });
+    const action = isAddFilesMode
+        ? addFilesToCollection(currentCommessaCode, sanitizedName)
+        : createCollection(currentCommessaCode, sanitizedName);
+
+    action.catch((error) => {
+        console.error('Error submitting collection:', error);
+        if (input && !isAddFilesMode) {
+            input.disabled = false;
+            input.style.opacity = '1';
+            input.style.cursor = 'text';
+        }
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+            confirmBtn.textContent = isAddFilesMode ? 'Aggiungi' : 'Crea';
+        }
+    });
 }
 
 function updateSelectedCommessaParam(commessaCode) {
@@ -2768,11 +2805,24 @@ function restoreSelectedCommessa() {
 // Functions for Create Collection Modal
 function openCreateCollectionModal(commessaCode) {
     currentCommessaCode = commessaCode;
+    isAddFilesMode = false;
+    addFilesCollectionName = null;
     const modal = document.getElementById('createCollectionModal');
     const input = document.getElementById('collectionNameInput');
-    
+    const confirmBtn = document.getElementById('createCollectionConfirmBtn');
+
     if (modal && input) {
         input.value = '';
+        input.disabled = false;
+        input.readOnly = false;
+        input.style.opacity = '1';
+        input.style.cursor = 'text';
+        if (confirmBtn) {
+            confirmBtn.textContent = 'Crea';
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+        }
         // reset selected files and update counter
         modalSelectedFiles = [];
         renderSelectedFilesCounter();
@@ -2783,13 +2833,57 @@ function openCreateCollectionModal(commessaCode) {
     }
 }
 
+function openAddFilesModal(commessaCode, collectionName) {
+    currentCommessaCode = commessaCode;
+    isAddFilesMode = true;
+    addFilesCollectionName = collectionName;
+    const modal = document.getElementById('createCollectionModal');
+    const input = document.getElementById('collectionNameInput');
+    const confirmBtn = document.getElementById('createCollectionConfirmBtn');
+
+    if (modal && input) {
+        input.value = collectionName;
+        input.disabled = true;
+        input.readOnly = true;
+        input.style.opacity = '0.7';
+        input.style.cursor = 'not-allowed';
+        if (confirmBtn) {
+            confirmBtn.textContent = 'Aggiungi';
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+        }
+        modalSelectedFiles = [];
+        renderSelectedFilesCounter();
+        loadJobFiles(commessaCode, '');
+        modal.classList.add('open');
+    }
+}
+
 function closeCreateCollectionModalFunc() {
     const modal = document.getElementById('createCollectionModal');
+    const input = document.getElementById('collectionNameInput');
+    const confirmBtn = document.getElementById('createCollectionConfirmBtn');
     if (modal) {
         modal.classList.remove('open');
     }
+    if (input) {
+        input.disabled = false;
+        input.readOnly = false;
+        input.style.opacity = '1';
+        input.style.cursor = 'text';
+        input.value = '';
+    }
+    if (confirmBtn) {
+        confirmBtn.textContent = 'Crea';
+        confirmBtn.disabled = false;
+        confirmBtn.style.opacity = '1';
+        confirmBtn.style.cursor = 'pointer';
+    }
     currentCommessaCode = null;
     modalSelectedFiles = [];
+    isAddFilesMode = false;
+    addFilesCollectionName = null;
 }
 
 async function createCollection(commessaCode, collectionName) {
@@ -2896,6 +2990,77 @@ async function createCollection(commessaCode, collectionName) {
         }
     } catch (error) {
         console.error('Error creating collection:', error);
+        isCollectionCreating = false;
+        if (body) {
+            body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore di connessione:</strong> ${error.message}</div>`;
+        }
+        if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.style.opacity = '1';
+            confirmBtn.style.cursor = 'pointer';
+        }
+    }
+}
+
+async function addFilesToCollection(commessaCode, collectionName) {
+    console.log('addFilesToCollection called', { commessaCode, collectionName, files: modalSelectedFiles });
+
+    const confirmBtn = document.getElementById('createCollectionConfirmBtn');
+    const body = document.querySelector('.create-collection-body');
+
+    try {
+        isCollectionCreating = true;
+
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = '0.6';
+            confirmBtn.style.cursor = 'not-allowed';
+        }
+
+        const response = await fetch('/api/add-files-to-collection/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: JSON.stringify({
+                commessa: commessaCode,
+                collection_name: collectionName,
+                files: modalSelectedFiles,
+            }),
+        });
+
+        const data = await response.json();
+        console.log('add-files response', data);
+
+        if (response.status === 202 && data.collection_task_id) {
+            closeCreateCollectionModalFunc();
+            activeCollectionTasks.push({
+                id: data.collection_task_id,
+                commessa: data.commessa,
+                collection_name: data.collection_name,
+                status: data.status || 'pending',
+                files_done: 0,
+                files_total: (data.selected_files || []).length,
+            });
+            updateProcessingBadge();
+            startCollectionPolling();
+            if (data.warnings && data.warnings.length > 0) {
+                data.warnings.forEach(msg => showWarningBanner(msg));
+            }
+        } else {
+            isCollectionCreating = false;
+            if (body) {
+                body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore:</strong> ${data.error || 'Operazione non riuscita'}</div>`;
+            }
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = '1';
+                confirmBtn.style.cursor = 'pointer';
+            }
+        }
+    } catch (error) {
+        console.error('Error adding files to collection:', error);
         isCollectionCreating = false;
         if (body) {
             body.innerHTML = `<div style="padding:20px;color:red;text-align:center;font-size:14px;"><strong>Errore di connessione:</strong> ${error.message}</div>`;

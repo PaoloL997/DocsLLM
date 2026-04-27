@@ -459,6 +459,97 @@ def create_collection(request):
         return JsonResponse({'error': error_msg}, status=500)
 
 
+def add_files_to_collection(request):
+    """POST JSON: { commessa, collection_name, files: [relative paths] }
+
+    Adds new files to an existing Milvus collection asynchronously by creating
+    a ``CollectionTask`` and dispatching ``process_collection``. The task
+    instantiates a ``Store`` on the existing collection and uses ``store.add``
+    to incrementally index the new documents (same flow as creation).
+
+    Returns:
+        202 Accepted with the dispatched task info, or an error JSON.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        commessa = (data.get('commessa') or '').strip()
+        collection_name = (data.get('collection_name') or '').strip()
+        selected_files = data.get('files', []) if isinstance(data, dict) else []
+
+        if not commessa or not collection_name:
+            return JsonResponse(
+                {'error': 'Commessa and collection name are required'}, status=400,
+            )
+        if not selected_files:
+            return JsonResponse(
+                {'error': 'Seleziona almeno un file da aggiungere'}, status=400,
+            )
+
+        config = _load_config()
+        jobs_base = config.get('jobs', '')
+        full_paths = []
+        warnings = []
+        for rel_path in selected_files:
+            full_path = os.path.join(jobs_base, commessa, rel_path)
+            full_paths.append(full_path)
+            stem = Path(full_path).stem
+            if stem != stem.strip():
+                warnings.append(
+                    f'"{Path(full_path).name}" contiene spazi nel nome: '
+                    'il processing potrebbe fallire. Rinomina il file.'
+                )
+
+        from core.models import CollectionTask
+        from docslm.celery import app as celery_app
+
+        ct = CollectionTask.objects.create(
+            commessa=commessa,
+            collection_name=collection_name,
+            status='pending',
+            files=full_paths,
+            created_by=request.user if request.user.is_authenticated else None,
+        )
+
+        try:
+            conn = celery_app.connection()
+            conn.ensure_connection(max_retries=1, timeout=3)
+            conn.close()
+        except Exception:
+            ct.status = 'error'
+            ct.save(update_fields=['status'])
+            return JsonResponse(
+                {'error': 'Servizio di elaborazione non disponibile. Verifica che il broker sia attivo.'},
+                status=503,
+            )
+
+        from services.process import process_collection
+
+        result = process_collection.delay(ct.id)
+        ct.task_id = result.id
+        ct.save(update_fields=['task_id'])
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Aggiunta file alla collection {collection_name} avviata',
+            'commessa': commessa,
+            'collection_name': collection_name,
+            'selected_files': full_paths,
+            'collection_task_id': ct.id,
+            'status': ct.status,
+            'warnings': warnings,
+        }, status=202)
+
+    except FileNotFoundError as exc:
+        return JsonResponse({'error': str(exc)}, status=500)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': str(exc)}, status=500)
+
+
 def collection_task_status(request):
     """GET params: commessa, collection — return the latest task status.
 

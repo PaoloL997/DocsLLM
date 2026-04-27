@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/delete-collection-file/', views.delete_collection_file, name='delete_collection_file'),
     path('api/delete-collection/', views.delete_collection, name='delete_collection'),
     path('api/create-collection/', views.create_collection, name='create_collection'),
+    path('api/add-files-to-collection/', views.add_files_to_collection, name='add_files_to_collection'),
     path('api/collection-task-status/', views.collection_task_status, name='collection_task_status'),
     path('api/collection-tasks/active/', views.active_collection_tasks, name='active_collection_tasks'),
     path('api/initialize-agent/', views.initialize_agent, name='initialize_agent'),
