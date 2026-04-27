@@ -66,6 +66,10 @@ def process_collection(collection_task_id: int) -> dict:
         from duckling.graph import DucklingGraph
 
         for file_path in ct.files:
+            ct.refresh_from_db(fields=['status'])
+            if ct.status == 'cancelled':
+                logger.info("CollectionTask %s cancellata: interrompo il processing", collection_task_id)
+                return {'collection_task_id': collection_task_id, 'status': 'cancelled'}
             try:
                 filename = Path(file_path).stem
                 if filename != filename.strip():
@@ -94,6 +98,10 @@ def process_collection(collection_task_id: int) -> dict:
     except Exception:
         logger.exception("Errore fatale nella CollectionTask %s", collection_task_id)
         has_error = True
+
+    ct.refresh_from_db(fields=['status'])
+    if ct.status == 'cancelled':
+        return {'collection_task_id': collection_task_id, 'status': 'cancelled'}
 
     ct.status = 'error' if has_error else 'ready'
     ct.save(update_fields=['status'])
@@ -154,6 +162,10 @@ def generate_report_task(report_id: int) -> dict:
         user_id = f"comm_{rpt.commessa}_{rpt.collection_name}_report{rpt.id}{uuid.uuid4().hex[:6]}"
 
         for item in rpt.items.order_by('order'):
+            rpt.refresh_from_db(fields=['status'])
+            if rpt.status == 'cancelled':
+                logger.info("Report %s cancellato: interrompo il processing", report_id)
+                return {'report_id': report_id, 'status': 'cancelled'}
             try:
                 final_state = agent.invoke(item.query, user_id=user_id)
                 response = final_state.get('response', '')
@@ -190,6 +202,10 @@ def generate_report_task(report_id: int) -> dict:
         rpt.error_message = str(exc)
         rpt.save(update_fields=['error_message'])
         has_error = True
+
+    rpt.refresh_from_db(fields=['status'])
+    if rpt.status == 'cancelled':
+        return {'report_id': report_id, 'status': 'cancelled'}
 
     rpt.status = 'error' if has_error else 'ready'
     rpt.save(update_fields=['status'])
