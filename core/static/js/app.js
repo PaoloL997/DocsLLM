@@ -53,7 +53,7 @@ function setupUserMenu() {
             try {
                 await fetch('/logout/', {
                     method: 'POST',
-                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                    headers: { 'X-CSRFToken': getCookie('docslm_csrftoken') },
                 });
                 localStorage.removeItem('docslm_user');
                 window.location.href = '/login/';
@@ -108,7 +108,7 @@ async function handleReportFileUpload(event) {
         const response = await fetch('/api/generate-report/', {
             method: 'POST',
             headers: {
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: formData
         });
@@ -261,7 +261,7 @@ function setupEventListeners() {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
+                        'X-CSRFToken': getCookie('docslm_csrftoken')
                     },
                     body: JSON.stringify({
                         commessa: commessa,
@@ -867,7 +867,7 @@ async function initializeAgent(commessa, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({
                 commessa: commessa,
@@ -1090,7 +1090,7 @@ async function createCollection(commessaCode, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify(requestBody)
         });
@@ -1235,7 +1235,7 @@ async function deleteCollectionFile(commessa, collectionName, filename) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({
                 commessa: commessa,
@@ -2039,7 +2039,7 @@ async function sendMessage() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({ message: message, mode: mode })
         });
@@ -2201,7 +2201,7 @@ function openSourceModal(btnDef) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({ 
                 path: pathVal, 
@@ -2647,7 +2647,7 @@ async function initializeAgent(commessa, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({
                 commessa: commessa,
@@ -2930,7 +2930,7 @@ async function createCollection(commessaCode, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({
                 commessa: commessaCode,
@@ -3024,7 +3024,7 @@ async function addFilesToCollection(commessaCode, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
+                'X-CSRFToken': getCookie('docslm_csrftoken'),
             },
             body: JSON.stringify({
                 commessa: commessaCode,
@@ -3712,7 +3712,7 @@ async function sendMessage() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({ message: message, mode: mode })
         });
@@ -3785,7 +3785,7 @@ async function sendMessage() {
                     try {
                         const retryResp = await fetch('/api/send-message/', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('docslm_csrftoken') },
                             body: JSON.stringify({ message: message, mode: mode })
                         });
                         const retryData = await retryResp.json();
@@ -3897,7 +3897,7 @@ function openSourceModal(btnDef) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({ path: pathVal, page_start: ps !== undefined ? ps : null, page_end: pe !== undefined ? pe : null })
         }).then(r => r.json()).then(res => {
@@ -4273,7 +4273,7 @@ async function cancelCollectionTask(taskId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
+                'X-CSRFToken': getCookie('docslm_csrftoken'),
             },
             body: JSON.stringify({ id: taskId }),
         });
@@ -4301,7 +4301,7 @@ async function cancelReportTask(reportId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
+                'X-CSRFToken': getCookie('docslm_csrftoken'),
             },
             body: JSON.stringify({ id: reportId }),
         });
