@@ -2673,18 +2673,21 @@ async function initializeAgent(commessa, collectionName) {
             showAgentSuccess();
             // enable sending now that an agent is active
             enableSendButton();
+            return true;
         } else {
             console.error('Error initializing agent:', data.error);
             alert('Errore nell\'inizializzazione dell\'agent: ' + data.error);
             showAgentError();
             // keep send disabled
             disableSendButton();
+            return false;
         }
     } catch (error) {
         console.error('Error initializing agent:', error);
         alert('Errore di connessione: ' + error.message);
         showAgentError();
         disableSendButton();
+        return false;
     }
 }
 
@@ -3773,6 +3776,29 @@ async function sendMessage() {
             if (loaderRow) {
                 if (loaderRow._timer) clearInterval(loaderRow._timer);
                 loaderRow.remove();
+            }
+            // Auto-recover: session lost (race condition or server restart) — re-init and retry once
+            if (activeCollection && data.error && data.error.includes('Nessun agent attivo')) {
+                console.warn('[sendMessage] Session lost, re-initializing agent and retrying...');
+                const reInitOk = await initializeAgent(activeCollection.commessa, activeCollection.collection);
+                if (reInitOk) {
+                    try {
+                        const retryResp = await fetch('/api/send-message/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                            body: JSON.stringify({ message: message, mode: mode })
+                        });
+                        const retryData = await retryResp.json();
+                        if (retryData.success) {
+                            appendMessage('assistant', retryData.response || '');
+                        } else {
+                            appendMessage('assistant', retryData.error || 'Errore durante la richiesta');
+                        }
+                    } catch (retryErr) {
+                        appendMessage('assistant', 'Errore di rete, riprova.');
+                    }
+                    return;
+                }
             }
             appendMessage('assistant', data.error || 'Errore durante la richiesta');
             if (userRow) {

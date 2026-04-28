@@ -148,8 +148,9 @@ CELERY_TIMEZONE = 'Europe/Rome'
 CELERY_TASK_DEFAULT_QUEUE = 'docslm'
 
 # Session
-SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_NAME = "docslm_sessionid"
+CSRF_COOKIE_NAME = "docslm_csrftoken"
 
 # Auth
 LOGIN_URL = '/login/'

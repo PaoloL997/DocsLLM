@@ -32,7 +32,36 @@ def send_message(request):
         session_key = request.session.session_key
         agent = AGENT_INSTANCES.get(session_key)
         if not agent:
-            return JsonResponse({'error': 'Agent non trovato in memoria. Riseleziona il notebook.'}, status=400)
+            # Agent lost from memory (server restart) — rebuild it from session data.
+            try:
+                import sys
+                sys.path.append(os.path.join(settings.BASE_DIR, 'docslm'))
+                from services.agent import Agent as AgentClass
+                from graphrag.store.store import Store
+
+                config_path = os.path.join(settings.BASE_DIR, 'config.yaml')
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+
+                commessa = active_agent['commessa']
+                collection_name = active_agent['collection']
+                mode = active_agent.get('mode', 'veloce')
+                mode_cfg = AgentClass.MODES.get(mode, {})
+                k_value = mode_cfg.get('k', 4)
+
+                store = Store(
+                    uri=config.get('uri'),
+                    database=f"comm_{commessa}",
+                    collection=collection_name,
+                    k=k_value,
+                    embedding_model=config.get('embedding_model'),
+                )
+                agent = AgentClass(store=store, mode=mode, rerank=True)
+                AGENT_INSTANCES[session_key] = agent
+                print(f"[AGENT RESTORE] Rebuilt agent for session {session_key[:8]}")
+            except Exception as restore_err:
+                print(f"[AGENT RESTORE] Failed: {restore_err}")
+                return JsonResponse({'error': 'Agent non trovato in memoria. Riseleziona il notebook.'}, status=400)
         instance_username = f"comm_{active_agent['commessa']}_{active_agent['collection']}_{username}" # For job/collection context memory isolation
         print(f"[AGENT INVOKE] User: {instance_username}, Message: {message}")
         final_state = agent.invoke(message, user_id=instance_username)
