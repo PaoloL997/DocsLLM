@@ -52,7 +52,7 @@
         logoutBtn.addEventListener('click', async () => {
             await fetch('/logout/', {
                 method: 'POST',
-                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                headers: { 'X-CSRFToken': getCookie('docslm_csrftoken') },
             });
             window.location.href = '/login/';
         });

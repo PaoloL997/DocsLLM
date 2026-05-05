@@ -47,7 +47,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-CSRFToken': getCookie('docslm_csrftoken'),
                 },
                 body: JSON.stringify({
                     commessa: commessa,
@@ -109,7 +109,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-CSRFToken': getCookie('docslm_csrftoken'),
                 },
                 body: JSON.stringify({ query }),
             });

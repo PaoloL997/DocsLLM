@@ -234,7 +234,7 @@
         try {
             const res = await fetch(
                 `/api/reports/delete/?id=${encodeURIComponent(reportId)}`,
-                { method: 'DELETE', headers: { 'X-CSRFToken': getCookie('csrftoken') } }
+                { method: 'DELETE', headers: { 'X-CSRFToken': getCookie('docslm_csrftoken') } }
             );
             if (!res.ok) throw new Error('delete failed');
             await refreshReports();
@@ -408,7 +408,7 @@
         try {
             const res = await fetch(
                 `/api/reports/item/delete/?id=${encodeURIComponent(itemId)}`,
-                { method: 'DELETE', headers: { 'X-CSRFToken': getCookie('csrftoken') } }
+                { method: 'DELETE', headers: { 'X-CSRFToken': getCookie('docslm_csrftoken') } }
             );
             if (!res.ok) throw new Error('delete failed');
 
@@ -456,7 +456,7 @@
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-CSRFToken': getCookie('docslm_csrftoken'),
                 },
                 body: JSON.stringify({ id: currentEditItem.id, query, response }),
             });
@@ -530,7 +530,7 @@
         try {
             const res = await fetch('/api/reports/create/', {
                 method: 'POST',
-                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                headers: { 'X-CSRFToken': getCookie('docslm_csrftoken') },
                 body: fd,
             });
             const data = await res.json();

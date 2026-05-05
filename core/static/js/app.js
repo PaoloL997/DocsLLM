@@ -53,7 +53,7 @@ function setupUserMenu() {
             try {
                 await fetch('/logout/', {
                     method: 'POST',
-                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                    headers: { 'X-CSRFToken': getCookie('docslm_csrftoken') },
                 });
                 localStorage.removeItem('docslm_user');
                 window.location.href = '/login/';
@@ -108,7 +108,7 @@ async function handleReportFileUpload(event) {
         const response = await fetch('/api/generate-report/', {
             method: 'POST',
             headers: {
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: formData
         });
@@ -261,7 +261,7 @@ function setupEventListeners() {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
+                        'X-CSRFToken': getCookie('docslm_csrftoken')
                     },
                     body: JSON.stringify({
                         commessa: commessa,
@@ -867,7 +867,7 @@ async function initializeAgent(commessa, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({
                 commessa: commessa,
@@ -1090,7 +1090,7 @@ async function createCollection(commessaCode, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify(requestBody)
         });
@@ -1235,7 +1235,7 @@ async function deleteCollectionFile(commessa, collectionName, filename) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({
                 commessa: commessa,
@@ -2039,7 +2039,7 @@ async function sendMessage() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({ message: message, mode: mode })
         });
@@ -2201,7 +2201,7 @@ function openSourceModal(btnDef) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({ 
                 path: pathVal, 
@@ -2647,7 +2647,7 @@ async function initializeAgent(commessa, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({
                 commessa: commessa,
@@ -2673,18 +2673,21 @@ async function initializeAgent(commessa, collectionName) {
             showAgentSuccess();
             // enable sending now that an agent is active
             enableSendButton();
+            return true;
         } else {
             console.error('Error initializing agent:', data.error);
             alert('Errore nell\'inizializzazione dell\'agent: ' + data.error);
             showAgentError();
             // keep send disabled
             disableSendButton();
+            return false;
         }
     } catch (error) {
         console.error('Error initializing agent:', error);
         alert('Errore di connessione: ' + error.message);
         showAgentError();
         disableSendButton();
+        return false;
     }
 }
 
@@ -2927,7 +2930,7 @@ async function createCollection(commessaCode, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({
                 commessa: commessaCode,
@@ -3021,7 +3024,7 @@ async function addFilesToCollection(commessaCode, collectionName) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
+                'X-CSRFToken': getCookie('docslm_csrftoken'),
             },
             body: JSON.stringify({
                 commessa: commessaCode,
@@ -3709,7 +3712,7 @@ async function sendMessage() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({ message: message, mode: mode })
         });
@@ -3773,6 +3776,29 @@ async function sendMessage() {
             if (loaderRow) {
                 if (loaderRow._timer) clearInterval(loaderRow._timer);
                 loaderRow.remove();
+            }
+            // Auto-recover: session lost (race condition or server restart) — re-init and retry once
+            if (activeCollection && data.error && data.error.includes('Nessun agent attivo')) {
+                console.warn('[sendMessage] Session lost, re-initializing agent and retrying...');
+                const reInitOk = await initializeAgent(activeCollection.commessa, activeCollection.collection);
+                if (reInitOk) {
+                    try {
+                        const retryResp = await fetch('/api/send-message/', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('docslm_csrftoken') },
+                            body: JSON.stringify({ message: message, mode: mode })
+                        });
+                        const retryData = await retryResp.json();
+                        if (retryData.success) {
+                            appendMessage('assistant', retryData.response || '');
+                        } else {
+                            appendMessage('assistant', retryData.error || 'Errore durante la richiesta');
+                        }
+                    } catch (retryErr) {
+                        appendMessage('assistant', 'Errore di rete, riprova.');
+                    }
+                    return;
+                }
             }
             appendMessage('assistant', data.error || 'Errore durante la richiesta');
             if (userRow) {
@@ -3871,7 +3897,7 @@ function openSourceModal(btnDef) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': getCookie('docslm_csrftoken')
             },
             body: JSON.stringify({ path: pathVal, page_start: ps !== undefined ? ps : null, page_end: pe !== undefined ? pe : null })
         }).then(r => r.json()).then(res => {
@@ -4247,7 +4273,7 @@ async function cancelCollectionTask(taskId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
+                'X-CSRFToken': getCookie('docslm_csrftoken'),
             },
             body: JSON.stringify({ id: taskId }),
         });
@@ -4275,7 +4301,7 @@ async function cancelReportTask(reportId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
+                'X-CSRFToken': getCookie('docslm_csrftoken'),
             },
             body: JSON.stringify({ id: reportId }),
         });
