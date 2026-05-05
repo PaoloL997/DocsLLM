@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 from services.store import ManageDB
 from graphrag.store.store import Store
 
-MAX_PREVIEW_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_PREVIEW_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
 def _load_config() -> dict:
@@ -74,13 +74,26 @@ def check_path(request):
 
         # Normalize to absolute path if relative is provided
         if not os.path.isabs(path):
-            candidate = os.path.join(settings.BASE_DIR, path)
-            if os.path.exists(candidate):
-                path = candidate
+            for base in (settings.MEDIA_ROOT, str(settings.BASE_DIR)):
+                candidate = os.path.join(base, path)
+                if os.path.exists(candidate):
+                    path = candidate
+                    break
 
         print(f"[check_path] requested path={path} type={file_type}")
 
         exists = os.path.exists(path)
+
+        # Fallback: if file not found, try same stem with alternative extensions
+        if not exists and not os.path.isdir(path):
+            stem = os.path.splitext(path)[0]
+            for alt_ext in ('.txt', '.md', '.pdf', '.json'):
+                alt = stem + alt_ext
+                if os.path.exists(alt):
+                    path = alt
+                    exists = True
+                    break
+
         resp = {'exists': exists, 'path': path}
         if not exists:
             print(f"[check_path] path does not exist")
@@ -107,10 +120,15 @@ def check_path(request):
         except Exception:
             resp['size'] = None
 
+        is_pdf_path = path.lower().endswith('.pdf')
+        has_page_range = (data.get('page_start') is not None)
         if resp.get('size') and resp['size'] > MAX_PREVIEW_BYTES:
-            resp['error'] = 'File troppo grande per anteprima'
-            print(f"[check_path] file too large size={resp['size']}")
-            return JsonResponse(resp)
+            # Allow large PDFs through if a page range is specified — we'll
+            # extract only the requested pages and check the output size later.
+            if not (is_pdf_path and has_page_range and PdfReader is not None):
+                resp['error'] = 'File troppo grande per anteprima'
+                print(f"[check_path] file too large size={resp['size']}")
+                return JsonResponse(resp)
 
         mimetypes.init()
         mime, _ = mimetypes.guess_type(path)
@@ -176,6 +194,8 @@ def check_path(request):
                     out_bytes = out.getvalue()
                     if len(out_bytes) > MAX_PREVIEW_BYTES:
                         resp['error'] = 'Anteprima estratta troppo grande'
+                        if resp.get('url'):
+                            resp['download_url'] = resp['url']
                         return JsonResponse(resp)
                     resp['pdf_data_uri'] = "data:application/pdf;base64," + base64.b64encode(out_bytes).decode('ascii')
                     resp['extracted_pages'] = {'page_start': ps, 'page_end': pe}

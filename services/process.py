@@ -79,6 +79,11 @@ def process_collection(collection_task_id: int) -> dict:
                         "Rinomina il file rimuovendo gli spazi.",
                         file_path,
                     )
+
+                if file_path.lower().endswith('.pdf'):
+                    from services.compress import compress_pdf
+                    compress_pdf(file_path)
+
                 result = DucklingGraph().run(file_path, namespace=filename)
                 documents = result.get('documents', [])
 
